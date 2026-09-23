@@ -1,0 +1,41 @@
+[
+  {
+    "id": "emp_001",
+    "name": "Алихан Смаилов",
+    "department": "IT Core Banking",
+    "current_role": "Backend Developer",
+    "current_grade": "Middle",
+    "target_grade": "Senior",
+    "skills": {
+      "Python": 3,
+      "PostgreSQL": 3,
+      "FastAPI": 3,
+      "Docker": 2,
+      "System Design": 2,
+      "Kubernetes": 1
+    },
+    "preferences": {
+      "preferred_formats": ["workshop", "webinar"],
+      "max_hours_per_week": 6
+    }
+  },
+  {
+    "id": "emp_002",
+    "name": "Динара Касымова",
+    "department": "Data Science",
+    "current_role": "Data Scientist",
+    "current_grade": "Junior",
+    "target_grade": "Middle",
+    "skills": {
+      "Python": 3,
+      "SQL": 2,
+      "Machine Learning": 2,
+      "Deep Learning": 1,
+      "MLOps": 1
+    },
+    "preferences": {
+      "preferred_formats": ["hackathon", "workshop"],
+      "max_hours_per_week": 8
+    }
+  }
+]

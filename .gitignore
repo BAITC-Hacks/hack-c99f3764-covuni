@@ -42,6 +42,8 @@ pnpm-debug.log*
 lerna-debug.log*
 frontend/dist/
 frontend/build/
+.pnpm-store/
+.vercel/
 .next/
 out/
 

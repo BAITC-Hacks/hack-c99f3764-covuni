@@ -333,7 +333,59 @@ def calculate_multi_factor_recommendations(
         if len(unique_recommendations) >= max_recommendations:
             break
 
-    return enhance_with_llm_if_available(emp, unique_recommendations, loader)
+    return unique_recommendations
+
+
+def build_verified_factor_summary(
+    language: str,
+    *,
+    target_role: str,
+    target_grade: str,
+    skill: str,
+    current_level: int,
+    required_level: int,
+    gap: int,
+    is_critical: bool,
+    gain: int,
+    projected_level: int,
+    max_level: int,
+    event_format: str,
+    format_history: Dict[str, int],
+    format_is_preferred: bool,
+) -> str:
+    """Builds a localized, fully verified four-factor explanation."""
+    completed = format_history.get("completed", 0)
+    no_show = format_history.get("no_show", 0)
+    dropped = format_history.get("dropped", 0)
+
+    if language == "en":
+        criticality = "is a critical promotion skill" if is_critical else "supports the promotion profile"
+        preference = "; this is a preferred format" if format_is_preferred else ""
+        return (
+            f"Verified factors: for {target_grade} {target_role}, {skill} {criticality}: "
+            f"current level {current_level}, required {required_level}, gap {gap}. "
+            f"The activity adds +{gain}, reaching {projected_level} with a maximum of {max_level}; "
+            f"{event_format} history: {completed} completed, {no_show} no-shows, {dropped} dropped{preference}."
+        )
+
+    if language == "kk":
+        criticality = "шешуші дағды" if is_critical else "мансаптық өсуге қажет дағды"
+        preference = "; бұл қызметкердің таңдаулы форматы" if format_is_preferred else ""
+        return (
+            f"Тексерілген факторлар: {target_grade} {target_role} деңгейіне өту үшін {skill} — {criticality}; "
+            f"қазіргі деңгей {current_level}, талап {required_level}, алшақтық {gap}. "
+            f"Белсенділік +{gain} қосып, деңгейді {projected_level}-ке жеткізеді (ең көбі {max_level}); "
+            f"{event_format} тарихы: аяқталғаны {completed}, келмегені {no_show}, тоқтатылғаны {dropped}{preference}."
+        )
+
+    criticality = "критически важен для повышения" if is_critical else "поддерживает профиль повышения"
+    preference = "; это предпочтительный формат сотрудника" if format_is_preferred else ""
+    return (
+        f"Проверенные факторы: для перехода на {target_grade} {target_role} навык {skill} "
+        f"{criticality}: текущий уровень {current_level}, требуется {required_level}, разрыв {gap}. "
+        f"Активность даст +{gain}, повысив уровень до {projected_level} при максимуме {max_level}; "
+        f"история формата {event_format}: завершено {completed}, неявок {no_show}, прервано {dropped}{preference}."
+    )
 
 
 def enhance_with_llm_if_available(
@@ -357,6 +409,11 @@ def enhance_with_llm_if_available(
         preferred_language = (emp.preferred_language or "ru").lower()
         if preferred_language not in {"ru", "kk", "en"}:
             preferred_language = "ru"
+        language_rule = {
+            "ru": "ОБЯЗАТЕЛЬНО: напиши rationale только на русском языке.",
+            "kk": "МІНДЕТТІ ТҮРДЕ: rationale мәтінін тек қазақ тілінде жаз; орыс және ағылшын тілдерін қолданба.",
+            "en": "MANDATORY: write the rationale only in English.",
+        }[preferred_language]
 
         grade_requirements = loader.get_grade_requirements(emp.target_role, emp.target_grade)
         critical_skills = set(loader.get_critical_skills(emp.target_role, emp.target_grade))
@@ -366,6 +423,7 @@ def enhance_with_llm_if_available(
         )
 
         candidate_context: List[Dict[str, Any]] = []
+        verified_summary_by_event: Dict[str, str] = {}
         for rec in recommendations:
             event = loader.get_event(rec.event_id)
             event_format = event.format if event else "unknown"
@@ -383,6 +441,9 @@ def enhance_with_llm_if_available(
                 for skill in critical_skills
             )
 
+            format_history = format_stats.get(event_format, {})
+            format_is_preferred = event_format in preferred_formats
+            projected_level = min(current_level + rec.gain, rec.max_level)
             candidate_context.append(
                 {
                     "event_id": rec.event_id,
@@ -394,29 +455,45 @@ def enhance_with_llm_if_available(
                     "critical_for_target_grade": is_critical,
                     "format": event_format,
                     "duration_hours": event.duration_hours if event else None,
-                    "format_is_preferred": event_format in preferred_formats,
-                    "history_for_this_format": format_stats.get(event_format, {}),
+                    "format_is_preferred": format_is_preferred,
+                    "history_for_this_format": format_history,
                     "gain": rec.gain,
                     "max_level": rec.max_level,
-                    "projected_level": min(current_level + rec.gain, rec.max_level),
+                    "projected_level": projected_level,
                     "deterministic_score": rec.score,
-                    "verified_fallback_rationale": rec.rationale,
                 }
+            )
+            verified_summary_by_event[rec.event_id] = build_verified_factor_summary(
+                preferred_language,
+                target_role=emp.target_role,
+                target_grade=emp.target_grade,
+                skill=rec.target_skill,
+                current_level=current_level,
+                required_level=required_level,
+                gap=max(0, required_level - current_level),
+                is_critical=is_critical,
+                gain=rec.gain,
+                projected_level=projected_level,
+                max_level=rec.max_level,
+                event_format=event_format,
+                format_history=format_history,
+                format_is_preferred=format_is_preferred,
             )
 
         system_prompt = (
+            f"{language_rule} "
             "You are Halyk Career AI, a careful career coach. Produce one personalized "
             "rationale for every supplied recommendation and keep the same event_id values. "
             "Write only in the employee's preferred language: ru means Russian, kk means "
-            "Kazakh, en means English. Each rationale must be 2-3 natural sentences and "
-            "must explain: the current skill gap and target grade; whether the skill is a "
-            "critical promotion blocker; the employee's completed, dropped, or no-show "
-            "history for this activity format; why this format is suitable; and the exact "
-            "gain and max_level. Praise successful participation when completed is positive, "
+            "Kazakh, en means English. Each rationale must be exactly one natural motivational "
+            "sentence of no more than 35 words. Explain why this activity and format are a good "
+            "next step given the target grade, skill gap, promotion criticality, and history. "
+            "Praise successful participation when completed is positive, "
             "and gently warn against another missed or dropped activity when those counts are "
             "positive. If history is empty, say there is no negative history for the format. "
             "Never invent facts, events, levels, dates, or history. Do not use markdown and "
-            "do not expose scoring formulas or internal field names."
+            "do not expose scoring formulas or internal field names. "
+            f"{language_rule}"
         )
         user_context = {
             "employee": {
@@ -426,6 +503,7 @@ def enhance_with_llm_if_available(
                 "target_role": emp.target_role,
                 "target_grade": emp.target_grade,
                 "preferred_language": preferred_language,
+                "mandatory_language_rule": language_rule,
                 "preferred_formats": preferred_formats,
             },
             "recommendations": candidate_context,
@@ -443,7 +521,7 @@ def enhance_with_llm_if_available(
                 },
             ],
             response_format=LLMRationaleResponse,
-            max_tokens=700,
+            max_tokens=350,
             temperature=0.25,
         )
         parsed = completion.choices[0].message.parsed
@@ -462,7 +540,10 @@ def enhance_with_llm_if_available(
             raise ValueError("OpenAI returned an empty rationale")
 
         for rec in recommendations:
-            rec.rationale = rationale_by_event[rec.event_id]
+            rec.rationale = (
+                f"{rationale_by_event[rec.event_id]} "
+                f"{verified_summary_by_event[rec.event_id]}"
+            )
     except Exception as e:
         logger.warning("LLM explanation enrichment skipped (using deterministic fallback): %s", e)
 
@@ -610,6 +691,7 @@ def get_recommendations(req: RecommendationRequest) -> RecommendationResponse:
         )
 
     recommendations = calculate_multi_factor_recommendations(target_emp, loader, max_recommendations=3)
+    recommendations = enhance_with_llm_if_available(target_emp, recommendations, loader)
 
     return RecommendationResponse(
         employee_id=target_emp.id,
@@ -721,4 +803,5 @@ def get_skills_matrix():
         "skills": list(loader._skills_catalog.values()),
         "grade_requirements": loader._grade_requirements,
     }
+
 

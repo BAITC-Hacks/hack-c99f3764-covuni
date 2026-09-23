@@ -7,7 +7,29 @@
     <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏦</text></svg>" />
   </head>
   <body>
-    <div id="app"></div>
+    <div id="app">
+      <!-- Jury Quick-Switch Bar & Header -->
+      <header class="topbar">
+        <button class="brand brand-button">
+          <span class="brand-mark">H</span>
+          <span><strong>Halyk Bank</strong><small>Career Quest AI</small></span>
+        </button>
+        <span class="team-badge">Team 202453</span>
+        <div style="flex:1"></div>
+        <div class="jury-demo-panel" id="jury-demo-panel">
+          <div class="jury-badge">
+            <span class="jury-title">🔑 Демо-вход (Жюри):</span>
+            <button type="button" class="jury-btn jury-emp-btn" id="jury-btn-employee" title="Переключить на демо-сотрудника E0028">👤 Демо-Сотрудник (E0028)</button>
+            <button type="button" class="jury-btn jury-hr-btn" id="jury-btn-hr" title="Переключить на HR-аналитику">📊 HR-Руководитель</button>
+            <div class="jury-tooltip">
+              <div class="tooltip-title">🔑 Тестовые логины для жюри:</div>
+              <div class="tooltip-row">👤 Сотрудник: <code>demo.employee@halykbank.kz</code> / <code>demo123</code></div>
+              <div class="tooltip-row">📊 HR-Руководитель: <code>hr.manager@halykbank.kz</code> / <code>admin123</code></div>
+            </div>
+          </div>
+        </div>
+      </header>
+    </div>
     <script type="module" src="/src/main.ts"></script>
   </body>
 </html>

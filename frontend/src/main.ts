@@ -15,9 +15,16 @@ const money = (value: number) => new Intl.NumberFormat("ru-RU").format(value);
 const percent = (value: number) => `${Math.round(value * 100)}%`;
 const categoryClass = (category: RewardCategory) => category.toLowerCase().replaceAll(" ", "-");
 
-function header(): string { if (state.view === "login") return ""; return `<header class="topbar"><button class="brand brand-button" data-view="employee"><span class="brand-mark">H</span><span><strong>Halyk Bank</strong><small>Career Quest AI</small></span></button><span class="team-badge">Team 202453</span><span class="api-status ${state.connected ? "online" : "offline"}"><i></i>${state.connected ? "API connected" : t().offline}</span><nav><button class="tab ${state.view === "employee" ? "active" : ""}" data-view="employee">${t().employee}</button><button class="tab ${state.view === "hr" ? "active" : ""}" data-view="hr">${t().hr}</button><button class="tab ${state.view === "rewards" || state.view === "history" ? "active" : ""}" data-view="rewards">${t().rewards}</button></nav><button class="profile-menu" data-view="history"><span class="avatar">AS</span><span class="desktop-only">Aigerim S.</span><span class="chevron">⌄</span></button><select id="language"><option value="ru" ${state.language === "ru" ? "selected" : ""}>RU</option><option value="kz" ${state.language === "kz" ? "selected" : ""}>KZ</option></select></header>`; }
+function renderJuryPanel(): string {
+  return `<div class="jury-demo-panel" id="jury-demo-panel"><div class="jury-badge"><span class="jury-title">🔑 Демо-вход (Жюри):</span><button type="button" class="jury-btn jury-emp-btn" id="jury-btn-employee" title="Переключить на демо-сотрудника E0028">👤 Демо-Сотрудник (E0028)</button><button type="button" class="jury-btn jury-hr-btn" id="jury-btn-hr" title="Переключить на HR-аналитику">📊 HR-Руководитель</button><div class="jury-tooltip"><div class="tooltip-title">🔑 Тестовые логины для жюри:</div><div class="tooltip-row">👤 Сотрудник: <code>demo.employee@halykbank.kz</code> / <code>demo123</code></div><div class="tooltip-row">📊 HR-Руководитель: <code>hr.manager@halykbank.kz</code> / <code>admin123</code></div></div></div></div>`;
+}
+
+function header(): string {
+  return `<header class="topbar"><button class="brand brand-button" data-view="employee"><span class="brand-mark">H</span><span><strong>Halyk Bank</strong><small>Career Quest AI</small></span></button><span class="team-badge">Team 202453</span><span class="api-status ${state.connected ? "online" : "offline"}"><i></i>${state.connected ? "API connected" : t().offline}</span>${state.view !== "login" ? `<nav><button class="tab ${state.view === "employee" ? "active" : ""}" data-view="employee">${t().employee}</button><button class="tab ${state.view === "hr" ? "active" : ""}" data-view="hr">${t().hr}</button><button class="tab ${state.view === "rewards" || state.view === "history" ? "active" : ""}" data-view="rewards">${t().rewards}</button></nav><button class="profile-menu" data-view="history"><span class="avatar">AS</span><span class="desktop-only">Aigerim S.</span><span class="chevron">⌄</span></button>` : `<div style="flex:1"></div>`}${renderJuryPanel()}<select id="language"><option value="ru" ${state.language === "ru" ? "selected" : ""}>RU</option><option value="kz" ${state.language === "kz" ? "selected" : ""}>KZ</option></select></header>`;
+}
+
 function renderLogin(): string {
-  return `<main class="auth-page"><div class="auth-visual"><div class="auth-mark">H</div><p class="eyebrow">HALYK BANK · CAREER QUEST</p><h1>Grow with purpose.</h1><p>Ваш следующий шаг в развитии — и награда за прогресс.</p></div><section class="auth-card"><div class="auth-logo"><span class="brand-mark">H</span><strong>Halyk Bank</strong></div><h2>${state.authEnabled ? "Вход в Career Quest" : "Демонстрация Career Quest"}</h2><p class="muted">${state.authEnabled ? "Введите данные учётной записи, созданной администратором." : "Выберите сотрудника и пройдите путь от развития до награды. Демо работает без пароля."}</p><form id="login-form">${state.authEnabled ? `<label>Логин<input name="username" autocomplete="username" required></label><label>Пароль<input name="password" type="password" autocomplete="current-password" required></label>` : ""}<button class="button primary wide" type="submit" ${!state.authChecked || !state.connected || state.loading ? "disabled" : ""}>${state.loading ? "Загрузка…" : state.authEnabled ? "Войти" : "Открыть демо"}</button></form>${state.error ? `<p class="error-message">${esc(state.error)}</p>` : ""}</section></main>`;
+  return `<main class="auth-page"><div class="auth-visual"><div class="auth-mark">H</div><p class="eyebrow">HALYK BANK · CAREER QUEST</p><h1>Grow with purpose.</h1><p>Ваш следующий шаг в развитии — и награда за прогресс.</p></div><section class="auth-card"><div class="auth-logo"><span class="brand-mark">H</span><strong>Halyk Bank</strong></div><h2>${state.authEnabled ? "Вход в Career Quest" : "Демонстрация Career Quest"}</h2><p class="muted">${state.authEnabled ? "Введите данные учётной записи, созданной администратором." : "Выберите сотрудника и пройдите путь от развития до награды. Демо работает без пароля."}</p><form id="login-form">${state.authEnabled ? `<label>Логин<input name="username" autocomplete="username" value="demo.employee@halykbank.kz" required></label><label>Пароль<input name="password" type="password" autocomplete="current-password" value="demo123" required></label>` : ""}<button class="button primary wide" type="submit" ${!state.authChecked || !state.connected || state.loading ? "disabled" : ""}>${state.loading ? "Загрузка…" : state.authEnabled ? "Войти" : "Открыть демо"}</button></form><div class="quick-demo-box"><div class="quick-demo-title">🔑 Быстрый демо-вход для жюри:</div><div class="quick-demo-buttons"><button type="button" class="jury-btn jury-emp-btn" id="login-quick-emp">👤 Демо-Сотрудник (E0028)</button><button type="button" class="jury-btn jury-hr-btn" id="login-quick-hr">📊 HR-Руководитель</button></div><div class="quick-demo-creds"><div>👤 Сотрудник: <code>demo.employee@halykbank.kz</code> / <code>demo123</code></div><div>📊 HR: <code>hr.manager@halykbank.kz</code> / <code>admin123</code></div></div></div>${state.error ? `<p class="error-message">${esc(state.error)}</p>` : ""}</section></main>`;
 }
 function renderEmployee(): string { const profile = state.profile; return `<main><section class="page-head"><div><p class="eyebrow">PRIVATE EMPLOYEE SPACE</p><h1>Доброе утро, ${esc(profile.name ?? profile.employee_id)}</h1><p class="muted">Ваша текущая карьерная траектория и следующий шаг развития.</p></div><div class="toolbar"><select id="employee-select">${state.employees.map((e) => `<option value="${esc(e.employee_id)}" ${e.employee_id === profile.employee_id ? "selected" : ""}>${esc(e.employee_id)} · ${esc(e.role)} · ${esc(e.grade)}</option>`).join("")}</select><button class="button secondary" id="upload-button">${t().upload}</button><input id="profile-file" type="file" accept="application/json,.json" hidden></div></section><div class="profile-grid"><article class="card profile-card"><div><span class="role-label">${esc(profile.role)}</span><span class="grade-badge">${esc(profile.grade)}</span><p class="muted">${profile.tenure_months} месяцев в Halyk</p></div><div class="target"><small>Целевой грейд</small><strong>${esc(profile.next_grade ?? "Senior")}</strong><span class="status-chip">Progressing steadily</span></div></article><article class="card journey"><h2>Ваша карьерная траектория</h2><p class="muted">Текущий грейд и следующий целевой уровень.</p><div class="journey-line"><span></span><b></b><i></i></div><div class="journey-labels"><span>Junior</span><strong>${esc(profile.grade)}</strong><span>${esc(profile.next_grade ?? "Senior")}</span></div></article></div><div class="dashboard-grid"><article class="card skills"><h2>Навыки для следующего грейда</h2><p class="muted">Навыки с наибольшим влиянием на следующий грейд.</p>${profile.skills.map((skill) => `<div class="skill-row"><div class="skill-meta"><strong>${esc(skill.name)}</strong><span class="gap ${skill.gap > 1 ? "attention" : ""}">Gap ${skill.gap}</span><small>${skill.current_level} / ${skill.required_level}</small></div><div class="progress"><span style="width:${Math.min(100, (skill.current_level / Math.max(skill.required_level, 1)) * 100)}%"></span></div></div>`).join("")}<p class="hint">Skill gap — это фокус развития, а не оценка сотрудника.</p></article><article class="recommendations"><div class="section-title"><div><h2>Рекомендованные активности</h2><p class="muted">AI учитывает четыре фактора, а не только самый низкий навык.</p></div><span class="ai-pill">AI powered</span></div>${state.loading ? loadingRecommendations() : state.recommendations.map(renderRecommendation).join("")}${state.error ? `<p class="error-message">${esc(state.error)}</p>` : ""}</article></div>${renderPointsCard()}<button class="assistant-launcher" title="Halyk AI Assistant" data-chat-open><span>AI</span> Спросить Halyk AI</button></main>`; }
 function renderPointsCard(): string { return `<article class="card points-card"><div class="points-icon">✦</div><div><p class="eyebrow">YOUR PRIVATE BALANCE</p><h2>${money(state.points)} <span>QP</span></h2><p class="muted">Quest Points за добровольное развитие и инициативу</p></div><div class="points-breakdown"><span>Всего заработано <b>+${money(state.totalEarned)}</b></span><span>Уже потрачено <b>${money(state.totalSpent)}</b></span><span>Заявок на награды <b>${state.requests.length}</b></span></div><button class="button primary" data-view="rewards">Open Rewards Store <span>→</span></button></article>`; }
@@ -92,13 +99,85 @@ async function decideRewardRequest(requestId: string, decision: "Approved" | "Re
   render();
 }
 function bindRewardDecisions(): void { document.querySelectorAll<HTMLButtonElement>("[data-reward-decision]").forEach((button) => button.addEventListener("click", () => void decideRewardRequest(button.dataset.request!, button.dataset.rewardDecision as "Approved" | "Rejected"))); }
-function bind(): void { document.querySelectorAll<HTMLElement>("[data-view]").forEach((el) => el.addEventListener("click", () => { state.view = el.dataset.view as View; render(); if (state.view === "hr") void refreshHr().then(render).catch(showError); if (state.view === "history") void refreshWallet().then(render).catch(showError); })); document.querySelector<HTMLSelectElement>("#language")?.addEventListener("change", (event) => { state.language = (event.target as HTMLSelectElement).value as Language; render(); }); document.querySelector<HTMLButtonElement>("[data-language-switch]")?.addEventListener("click", () => { state.language = state.language === "ru" ? "kz" : "ru"; render(); }); document.querySelector<HTMLFormElement>("#login-form")?.addEventListener("submit", (event) => { event.preventDefault(); void signIn(event.currentTarget as HTMLFormElement); }); document.querySelector<HTMLButtonElement>("[data-password-toggle]")?.addEventListener("click", (event) => { const button = event.currentTarget as HTMLButtonElement; const input = button.parentElement?.querySelector<HTMLInputElement>("input"); if (input) { input.type = input.type === "password" ? "text" : "password"; button.textContent = input.type === "password" ? "Show" : "Hide"; } }); document.querySelector<HTMLSelectElement>("#employee-select")?.addEventListener("change", (event) => void loadEmployee((event.target as HTMLSelectElement).value)); document.querySelector("#upload-button")?.addEventListener("click", () => document.querySelector<HTMLInputElement>("#profile-file")?.click()); document.querySelector<HTMLInputElement>("#profile-file")?.addEventListener("change", (event) => { const file = (event.target as HTMLInputElement).files?.[0]; if (file) void uploadProfile(file); }); document.querySelectorAll<HTMLButtonElement>(".complete-button").forEach((button) => button.addEventListener("click", () => void completeActivity(button.dataset.activity!))); document.querySelector("[data-chat-open]")?.addEventListener("click", () => { state.chatOpen = true; render(); }); document.querySelector("[data-chat-close]")?.addEventListener("click", () => { state.chatOpen = false; render(); }); document.querySelectorAll<HTMLButtonElement>("[data-suggestion]").forEach((button) => button.addEventListener("click", () => void sendChat(button.dataset.suggestion!))); document.querySelector<HTMLFormElement>("#chat-form")?.addEventListener("submit", (event) => { event.preventDefault(); const input = (event.currentTarget as HTMLFormElement).elements.namedItem("message") as HTMLInputElement; void sendChat(input.value); input.value = ""; }); document.querySelectorAll<HTMLButtonElement>("[data-reward]").forEach((button) => button.addEventListener("click", () => { state.selectedReward = state.rewards.find((reward) => reward.id === button.dataset.reward); render(); })); document.querySelectorAll<HTMLElement>("[data-close-drawer]").forEach((element) => element.addEventListener("click", () => { if (element.classList.contains("drawer-backdrop") || element.classList.contains("drawer-close")) { state.selectedReward = undefined; render(); } })); document.querySelector("[data-redeem]")?.addEventListener("click", (event) => redeemReward((event.currentTarget as HTMLElement).dataset.redeem!)); document.querySelectorAll<HTMLButtonElement>("[data-category]").forEach((button) => button.addEventListener("click", () => { const value = button.dataset.category as RewardCategory | "All rewards"; document.querySelectorAll("[data-category]").forEach((item) => item.classList.toggle("active", item === button)); document.querySelectorAll<HTMLElement>(".reward-card").forEach((card) => { const category = card.querySelector<HTMLElement>(".category-tag")?.textContent; card.style.display = value === "All rewards" || category === value ? "" : "none"; }); })); }
+async function switchToDemoEmployee(): Promise<void> {
+  state.loading = true; state.error = undefined; render();
+  try {
+    if (state.authEnabled) {
+      try {
+        const res = await api.login("demo.employee@halykbank.kz", "demo123");
+        state.user = res.user;
+      } catch (err) {
+        console.warn("Demo employee login API:", err);
+      }
+    }
+    await loadApplication();
+    await loadEmployee("E0028");
+    state.view = "employee";
+    state.toast = { message: "Демо-вход: выбран сотрудник E0028", tone: "success" };
+  } catch (err) {
+    state.toast = { message: `Ошибка переключения: ${String(err)}`, tone: "error" };
+  } finally {
+    state.loading = false;
+    render();
+  }
+}
+
+async function switchToDemoHr(): Promise<void> {
+  state.loading = true; state.error = undefined; render();
+  try {
+    if (state.authEnabled) {
+      try {
+        const res = await api.login("hr.manager@halykbank.kz", "admin123");
+        state.user = res.user;
+      } catch (err) {
+        console.warn("Demo HR login API:", err);
+      }
+    }
+    await loadApplication();
+    await refreshHr();
+    state.view = "hr";
+    state.toast = { message: "Демо-вход: переключено на HR-аналитику", tone: "success" };
+  } catch (err) {
+    state.toast = { message: `Ошибка переключения: ${String(err)}`, tone: "error" };
+  } finally {
+    state.loading = false;
+    render();
+  }
+}
+
+function bind(): void {
+  document.querySelectorAll<HTMLElement>("[data-view]").forEach((el) => el.addEventListener("click", () => { state.view = el.dataset.view as View; render(); if (state.view === "hr") void refreshHr().then(render).catch(showError); if (state.view === "history") void refreshWallet().then(render).catch(showError); }));
+  document.querySelectorAll("#jury-btn-employee, #login-quick-emp").forEach((btn) => btn.addEventListener("click", () => void switchToDemoEmployee()));
+  document.querySelectorAll("#jury-btn-hr, #login-quick-hr").forEach((btn) => btn.addEventListener("click", () => void switchToDemoHr()));
+  document.querySelector<HTMLSelectElement>("#language")?.addEventListener("change", (event) => { state.language = (event.target as HTMLSelectElement).value as Language; render(); });
+  document.querySelector<HTMLButtonElement>("[data-language-switch]")?.addEventListener("click", () => { state.language = state.language === "ru" ? "kz" : "ru"; render(); });
+  document.querySelector<HTMLFormElement>("#login-form")?.addEventListener("submit", (event) => { event.preventDefault(); void signIn(event.currentTarget as HTMLFormElement); });
+  document.querySelector<HTMLButtonElement>("[data-password-toggle]")?.addEventListener("click", (event) => { const button = event.currentTarget as HTMLButtonElement; const input = button.parentElement?.querySelector<HTMLInputElement>("input"); if (input) { input.type = input.type === "password" ? "text" : "password"; button.textContent = input.type === "password" ? "Show" : "Hide"; } });
+  document.querySelector<HTMLSelectElement>("#employee-select")?.addEventListener("change", (event) => void loadEmployee((event.target as HTMLSelectElement).value));
+  document.querySelector("#upload-button")?.addEventListener("click", () => document.querySelector<HTMLInputElement>("#profile-file")?.click());
+  document.querySelector<HTMLInputElement>("#profile-file")?.addEventListener("change", (event) => { const file = (event.target as HTMLInputElement).files?.[0]; if (file) void uploadProfile(file); });
+  document.querySelectorAll<HTMLButtonElement>(".complete-button").forEach((button) => button.addEventListener("click", () => void completeActivity(button.dataset.activity!)));
+  document.querySelector("[data-chat-open]")?.addEventListener("click", () => { state.chatOpen = true; render(); });
+  document.querySelector("[data-chat-close]")?.addEventListener("click", () => { state.chatOpen = false; render(); });
+  document.querySelectorAll<HTMLButtonElement>("[data-suggestion]").forEach((button) => button.addEventListener("click", () => void sendChat(button.dataset.suggestion!)));
+  document.querySelector<HTMLFormElement>("#chat-form")?.addEventListener("submit", (event) => { event.preventDefault(); const input = (event.currentTarget as HTMLFormElement).elements.namedItem("message") as HTMLInputElement; void sendChat(input.value); input.value = ""; });
+  document.querySelectorAll<HTMLButtonElement>("[data-reward]").forEach((button) => button.addEventListener("click", () => { state.selectedReward = state.rewards.find((reward) => reward.id === button.dataset.reward); render(); }));
+  document.querySelectorAll<HTMLElement>("[data-close-drawer]").forEach((element) => element.addEventListener("click", () => { if (element.classList.contains("drawer-backdrop") || element.classList.contains("drawer-close")) { state.selectedReward = undefined; render(); } }));
+  document.querySelector("[data-redeem]")?.addEventListener("click", (event) => redeemReward((event.currentTarget as HTMLElement).dataset.redeem!));
+  document.querySelectorAll<HTMLButtonElement>("[data-category]").forEach((button) => button.addEventListener("click", () => { const value = button.dataset.category as RewardCategory | "All rewards"; document.querySelectorAll("[data-category]").forEach((item) => item.classList.toggle("active", item === button)); document.querySelectorAll<HTMLElement>(".reward-card").forEach((card) => { const category = card.querySelector<HTMLElement>(".category-tag")?.textContent; card.style.display = value === "All rewards" || category === value ? "" : "none"; }); }));
+}
 async function bootstrap(): Promise<void> {
   render();
   try {
     const [connected, session] = await Promise.all([api.health(), api.me()]);
     state.connected = connected; state.authEnabled = session.auth_enabled; state.user = session.user; state.authChecked = true;
-    if (state.user && state.authEnabled) { state.view = state.user.role === "hr" ? "hr" : "employee"; await loadApplication(); }
+    if (state.user && state.authEnabled) {
+      state.view = state.user.role === "hr" ? "hr" : "employee";
+      await loadApplication();
+    } else if (!state.authEnabled) {
+      state.view = "employee";
+      await loadApplication();
+    }
   } catch (error) { state.connected = false; state.error = `Не удалось подключиться к серверу: ${String(error)}`; }
   render();
 }

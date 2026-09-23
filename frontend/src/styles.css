@@ -39,3 +39,24 @@ main { max-width: 1440px; margin: 0 auto; padding: 42px 40px 64px; }.page-head {
 
 @media (max-width: 900px) { .auth-page { grid-template-columns: 1fr; }.auth-visual { min-height: 42vh; padding: 80px 8% 130px; }.auth-visual h1 { font-size: 52px; }.auth-mark { top: 28px; left: 8%; }.auth-quote { bottom: 30px; left: 8%; }.auth-card { width: min(520px,84%); padding: 48px 0; }.topbar { flex-wrap: wrap; height: auto; min-height: 64px; padding: 12px 18px; }.topbar nav { order: 5; position: static; width: 100%; justify-content: flex-start; margin: 0 -18px -12px; padding: 0 18px; overflow-x: auto; }.tab { padding: 14px 12px; }.points-card,.hr-rewards-preview { grid-template-columns: 1fr; }.points-breakdown { padding: 16px 0; border-top: 1px solid #dce7df; border-left: 0; }.reward-grid { grid-template-columns: repeat(2,1fr); }.store-principles { align-items: flex-start; flex-direction: column; }.history-summary { grid-template-columns: 1fr; }.mini-metrics { flex-wrap: wrap; } }
 @media (max-width: 560px) { .desktop-only,.team-badge { display: none; }.api-status { max-width: 28px; }.auth-visual { min-height: 380px; padding: 80px 24px 100px; }.auth-visual h1 { font-size: 44px; }.auth-visual>p:not(.eyebrow) { font-size: 15px; }.auth-mark { left: 24px; }.auth-quote { left: 24px; }.auth-card { width: auto; padding: 38px 24px; }.auth-logo { margin-bottom: 54px; }.auth-card h2 { font-size: 27px; }.reward-grid { grid-template-columns: 1fr; }.wallet { width: 100%; }.store-head { align-items: stretch; }.history-row { grid-template-columns: 40px 1fr auto; }.history-row>b { grid-column: 2; }.history-status { grid-column: 3; grid-row: 1; }.assistant-panel { right: 16px; bottom: 16px; height: min(590px,calc(100vh - 32px)); }.toast { right: 16px; bottom: 16px; left: 16px; max-width: none; }.points-card { padding: 18px; } }
+
+/* Jury Demo Quick-Switch Panel */
+.jury-demo-panel { position: relative; display: flex; align-items: center; margin-left: auto; }
+.jury-badge { display: flex; align-items: center; gap: 6px; background: #f0fdf4; border: 1px solid #86efac; border-radius: 12px; padding: 5px 10px; position: relative; box-shadow: 0 2px 8px rgba(34,197,94,.1); }
+.jury-title { font-size: 11px; font-weight: 800; color: #166534; white-space: nowrap; }
+.jury-btn { border: 1px solid transparent; border-radius: 8px; padding: 6px 10px; font-size: 11px; font-weight: 800; cursor: pointer; transition: all .15s ease; white-space: nowrap; }
+.jury-emp-btn { background: #dcfce7; color: #15803d; border-color: #86efac; }
+.jury-emp-btn:hover { background: #22c55e; color: #fff; }
+.jury-hr-btn { background: #e0f2fe; color: #0369a1; border-color: #7dd3fc; }
+.jury-hr-btn:hover { background: #0284c7; color: #fff; }
+.jury-badge:hover .jury-tooltip, .jury-badge:focus-within .jury-tooltip { visibility: visible; opacity: 1; transform: translateY(0); }
+.jury-tooltip { visibility: hidden; opacity: 0; position: absolute; top: calc(100% + 8px); right: 0; background: #1e293b; color: #f8fafc; border-radius: 12px; padding: 12px 16px; font-size: 11px; box-shadow: 0 12px 30px rgba(0,0,0,.25); z-index: 100; white-space: nowrap; transition: opacity .2s, transform .2s; transform: translateY(-4px); pointer-events: none; }
+.jury-tooltip .tooltip-title { font-weight: 800; color: #4ade80; margin-bottom: 8px; border-bottom: 1px solid #334155; padding-bottom: 6px; font-size: 12px; }
+.jury-tooltip .tooltip-row { margin: 4px 0; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; }
+.jury-tooltip code { color: #38bdf8; background: #0f172a; padding: 2px 6px; border-radius: 4px; font-weight: 600; }
+.quick-demo-box { margin-top: 24px; padding: 16px; background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 14px; }
+.quick-demo-title { font-size: 12px; font-weight: 800; color: #166534; margin-bottom: 10px; }
+.quick-demo-buttons { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 10px; }
+.quick-demo-creds { font-size: 11px; color: #475569; display: grid; gap: 4px; font-family: ui-monospace, SFMono-Regular, monospace; }
+.quick-demo-creds code { color: #0369a1; background: #e0f2fe; padding: 2px 5px; border-radius: 4px; }
+.auth-topbar { position: absolute; top: 0; left: 0; right: 0; background: rgba(255,255,255,.9); backdrop-filter: blur(8px); }

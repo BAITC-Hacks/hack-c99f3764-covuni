@@ -10,11 +10,12 @@ services:
     env_file:
       - .env
     environment:
-      - DATA_DIR=/app/data
-      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
-      - OPENAI_MODEL=${OPENAI_MODEL:-gpt-4o-mini}
-      - ENVIRONMENT=${ENVIRONMENT:-production}
-      - CORS_ORIGINS=${CORS_ORIGINS:-http://localhost:3000,http://127.0.0.1:3000}
+      DATA_DIR: /app/data
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      OPENAI_MODEL: ${OPENAI_MODEL:-gpt-4o-mini}
+      ENVIRONMENT: ${ENVIRONMENT:-production}
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000,http://127.0.0.1:3000}
+      DEMO_ACCOUNTS_ENABLED: "true"
     volumes:
       - ./data:/app/data:ro
     healthcheck:

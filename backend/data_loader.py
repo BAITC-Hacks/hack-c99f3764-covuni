@@ -626,12 +626,13 @@ class DataLoader:
         score: float = 100.0,
         feedback: str = "Завершено через Career Quest",
         event_date: Optional[str] = None,
+        record_id: Optional[str] = None,
     ) -> None:
         """Appends a new participation record to activity history."""
         from datetime import date
         with self.lock:
             new_row = {
-                "record_id": f"R_NEW_{len(self._activity_history) + 1}",
+                "record_id": record_id or f"R_NEW_{len(self._activity_history) + 1}",
                 "employee_id": str(employee_id),
                 "event_id": str(event_id),
                 "date": event_date or date.today().isoformat(),
@@ -653,7 +654,7 @@ class DataLoader:
         with self.lock:
             deficit_map: Dict[str, Dict[str, Any]] = {}
             for emp in self._employees.values():
-                reqs = self.get_grade_requirements(emp.current_role, emp.target_grade)
+                reqs = self.get_grade_requirements(emp.target_role, emp.target_grade)
                 for skill_id, required_level in reqs.items():
                     current = emp.skills.get(skill_id, 0)
                     gap = max(0, required_level - current)
@@ -693,11 +694,11 @@ class DataLoader:
                     dropped = int((history["status"] == "dropped").sum())
                     completed = int((history["status"] == "completed").sum())
 
-                reqs = self.get_grade_requirements(emp.current_role, emp.target_grade)
+                reqs = self.get_grade_requirements(emp.target_role, emp.target_grade)
                 total_gap = sum(max(0, req_lvl - emp.skills.get(sk, 0)) for sk, req_lvl in reqs.items())
 
                 # Risk criterion: >= 2 dropped/no_show or high gap without completions
-                if (no_shows + dropped >= 2) or (total_gap >= 5 and completed == 0):
+                if (no_shows + dropped >= 2) or completed == 0:
                     risk_list.append({
                         "employee_id": emp.employee_id,
                         "name": emp.full_name,
@@ -711,7 +712,7 @@ class DataLoader:
                         "risk_reason": (
                             f"Частые пропуски или прекращения курсов (пропусков: {no_shows}, брошено: {dropped})"
                             if (no_shows + dropped >= 2)
-                            else "Критический дефицит навыков до следующего грейда без активности"
+                            else "Нет завершённых активностей"
                         ),
                     })
             return risk_list

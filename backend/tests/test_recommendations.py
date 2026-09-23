@@ -334,10 +334,11 @@ def test_skill_progress_shift_and_ceiling(initialized_loader: DataLoader):
     assert updated_emp.skills["SK_SYSTEM_DESIGN"] == 2
     assert updated_emp.skills["SK_API_DESIGN"] == 3
 
-    # 2. Complete again: SK_API_DESIGN is now at max_level 3 -> should remain capped at 3
+    # 2. Retry the same completion: neither skills nor points may be farmed twice.
     resp2 = complete_activity(req)
     assert resp2.employee.skills["SK_API_DESIGN"] == 3
-    assert resp2.employee.skills["SK_SYSTEM_DESIGN"] == 3
+    assert resp2.employee.skills["SK_SYSTEM_DESIGN"] == 2
+    assert resp2.points_awarded == 0
 
 
 # ==============================================================================

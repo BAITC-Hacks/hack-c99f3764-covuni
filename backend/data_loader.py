@@ -45,7 +45,8 @@ class EventItem(BaseModel):
     format: str = "workshop"
     difficulty: Optional[str] = "intermediate"
     target_skills: List[str] = Field(default_factory=list)
-    skill_gain: int = 1
+    skill_gain: int = Field(default=1, ge=0)
+    max_level: int = Field(default=5, ge=0, le=5)
     duration_hours: float = 0.0
     date: Optional[str] = None
     description: Optional[str] = ""

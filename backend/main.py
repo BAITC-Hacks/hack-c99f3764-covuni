@@ -62,6 +62,42 @@ class RecommendationResponse(BaseModel):
     recommendations: List[RecommendationItem]
 
 
+class ParticipationHistorySummary(BaseModel):
+    total_records: int = 0
+    completed_count: int = 0
+    missed_count: int = 0
+    in_progress_count: int = 0
+    status_counts: Dict[str, int] = Field(default_factory=dict)
+    missed_event_ids: List[str] = Field(default_factory=list)
+    completed_formats: Dict[str, int] = Field(default_factory=dict)
+    missed_formats: Dict[str, int] = Field(default_factory=dict)
+    insight: str
+
+
+class AIRecommendationContext(BaseModel):
+    employee_id: str
+    employee_name: str
+    current_role: str
+    current_grade: str
+    target_grade: str
+    event_id: str
+    event_title: str
+    event_format: str
+    duration_hours: float
+    target_skill: str
+    current_level: int
+    required_level: int
+    skill_gap: int
+    is_required_for_target_grade: bool
+    is_promotion_blocker: bool
+    activity_gain: int
+    activity_max_level: int
+    projected_level: int
+    projected_gap: int
+    deterministic_score: float
+    participation_history: ParticipationHistorySummary
+
+
 class CompleteActivityRequest(BaseModel):
     employee_id: str
     event_id: str
@@ -93,6 +129,135 @@ class HRAnalyticsResponse(BaseModel):
 # Multi-Factor Scoring & Explainable Rationale Engine
 # ==============================================================================
 
+MISSED_PARTICIPATION_STATUSES = {
+    "skipped",
+    "no_show",
+    "declined",
+    "dropped",
+    "overdue",
+}
+
+
+def summarize_participation_history(
+    employee_id: str,
+    loader: DataLoader,
+) -> ParticipationHistorySummary:
+    """Builds a compact, factual history summary for scoring and the LLM prompt."""
+    history = loader.get_employee_history(employee_id)
+    if history.empty:
+        return ParticipationHistorySummary(
+            insight="История участия отсутствует; выводы о предпочтениях по формату не делаются."
+        )
+
+    status_counts: Dict[str, int] = {}
+    completed_formats: Dict[str, int] = {}
+    missed_formats: Dict[str, int] = {}
+    missed_event_ids: List[str] = []
+
+    for _, row in history.iterrows():
+        raw_status = str(row.get("status", "")).strip().lower()
+        if not raw_status or raw_status == "nan":
+            continue
+
+        status_counts[raw_status] = status_counts.get(raw_status, 0) + 1
+        event_id = str(row.get("event_id", "")).strip()
+        event = loader.get_event(event_id) if event_id else None
+        event_format = event.format if event else "unknown"
+
+        if raw_status == "completed":
+            completed_formats[event_format] = completed_formats.get(event_format, 0) + 1
+        elif raw_status in MISSED_PARTICIPATION_STATUSES:
+            if event_id:
+                missed_event_ids.append(event_id)
+            missed_formats[event_format] = missed_formats.get(event_format, 0) + 1
+
+    completed_count = status_counts.get("completed", 0)
+    missed_count = sum(status_counts.get(status, 0) for status in MISSED_PARTICIPATION_STATUSES)
+    in_progress_count = status_counts.get("in_progress", 0)
+
+    if missed_count:
+        known_missed_formats = {
+            event_format: count
+            for event_format, count in missed_formats.items()
+            if event_format != "unknown"
+        }
+        risky_formats = ", ".join(
+            f"{event_format}: {count}"
+            for event_format, count in sorted(
+                known_missed_formats.items(), key=lambda item: item[1], reverse=True
+            )
+        )
+        format_note = f"; чаще пропускались форматы {risky_formats}" if risky_formats else ""
+        insight = (
+            f"Завершено активностей: {completed_count}; пропущено, отклонено или прервано: "
+            f"{missed_count}{format_note}."
+        )
+    else:
+        insight = (
+            f"Завершено активностей: {completed_count}; негативных статусов участия нет."
+        )
+
+    return ParticipationHistorySummary(
+        total_records=len(history),
+        completed_count=completed_count,
+        missed_count=missed_count,
+        in_progress_count=in_progress_count,
+        status_counts=status_counts,
+        missed_event_ids=sorted(set(missed_event_ids)),
+        completed_formats=completed_formats,
+        missed_formats=missed_formats,
+        insight=insight,
+    )
+
+
+def build_ai_recommendation_context(
+    emp: EmployeeProfile,
+    recommendation: RecommendationItem,
+    loader: DataLoader,
+    history_summary: Optional[ParticipationHistorySummary] = None,
+) -> AIRecommendationContext:
+    """Collects the four required recommendation factors into one validated object."""
+    event = loader.get_event(recommendation.event_id)
+    if event is None:
+        raise ValueError(f"Event '{recommendation.event_id}' not found")
+
+    grade_reqs = loader.get_grade_requirements(emp.current_role, emp.target_grade)
+    current_level = emp.skills.get(recommendation.target_skill, 0)
+    required_level = grade_reqs.get(recommendation.target_skill, 0)
+    skill_gap = max(0, required_level - current_level)
+    is_required = recommendation.target_skill in grade_reqs
+    projected_level = max(
+        current_level,
+        min(current_level + event.skill_gain, event.max_level),
+    )
+    projected_gap = max(0, required_level - projected_level)
+
+    return AIRecommendationContext(
+        employee_id=emp.id,
+        employee_name=emp.name,
+        current_role=emp.current_role,
+        current_grade=emp.current_grade,
+        target_grade=emp.target_grade,
+        event_id=event.id,
+        event_title=event.title,
+        event_format=event.format,
+        duration_hours=event.duration_hours,
+        target_skill=recommendation.target_skill,
+        current_level=current_level,
+        required_level=required_level,
+        skill_gap=skill_gap,
+        is_required_for_target_grade=is_required,
+        is_promotion_blocker=is_required and skill_gap > 0,
+        activity_gain=event.skill_gain,
+        activity_max_level=event.max_level,
+        projected_level=projected_level,
+        projected_gap=projected_gap,
+        deterministic_score=recommendation.score,
+        participation_history=history_summary
+        or summarize_participation_history(emp.id, loader),
+    )
+
+
 def calculate_multi_factor_recommendations(
     emp: EmployeeProfile,
     loader: DataLoader,
@@ -107,15 +272,8 @@ def calculate_multi_factor_recommendations(
     """
     events = loader.get_events()
     grade_reqs = loader.get_grade_requirements(emp.current_role, emp.target_grade)
-    history = loader.get_employee_history(emp.id)
-
-    # Extract historical behavioral patterns
-    skipped_events = set()
-    skipped_formats = set()
-    if not history.empty and "status" in history.columns:
-        skipped_df = history[history["status"] == "skipped"]
-        if "event_id" in skipped_df.columns:
-            skipped_events = set(skipped_df["event_id"].astype(str))
+    history_summary = summarize_participation_history(emp.id, loader)
+    missed_events = set(history_summary.missed_event_ids)
 
     scored_candidates = []
 
@@ -138,21 +296,18 @@ def calculate_multi_factor_recommendations(
             history_reasons = []
 
             # Check if this exact event or skill format was repeatedly skipped
-            if event.id in skipped_events:
+            if event.id in missed_events:
                 history_multiplier *= 0.3
                 history_reasons.append("ранее пропущенное мероприятие")
 
             # Check if format has high skip rate in history
-            if not history.empty and "status" in history.columns:
-                user_skips_for_format = 0
-                for _, row in history.iterrows():
-                    hist_ev = loader.get_event(str(row.get("event_id", "")))
-                    if hist_ev and hist_ev.format == event.format and row.get("status") == "skipped":
-                        user_skips_for_format += 1
-                
-                if user_skips_for_format >= 2:
-                    history_multiplier *= 0.4
-                    history_reasons.append(f"низкая вовлеченность в формат {event.format} (пропусков: {user_skips_for_format})")
+            user_skips_for_format = history_summary.missed_formats.get(event.format, 0)
+            if user_skips_for_format >= 2:
+                history_multiplier *= 0.4
+                history_reasons.append(
+                    f"низкая вовлеченность в формат {event.format} "
+                    f"(пропусков/отказов: {user_skips_for_format})"
+                )
 
             # Factor 4: Event Fit & Efficiency (E_fit)
             efficiency = (event.skill_gain / max(event.duration_hours, 1.0)) * 2.0
@@ -174,12 +329,17 @@ def calculate_multi_factor_recommendations(
                     else "Высокая готовность к участию (без пропусков в истории)"
                 )
 
+                projected_level = max(
+                    current_level,
+                    min(current_level + event.skill_gain, event.max_level),
+                )
                 rationale = (
                     f"[Фактор 1: Дефицит] Текущий уровень '{target_skill}': {current_level}, "
                     f"требование для {emp.target_grade}: {required_level} (разрыв: {skill_gap}). "
                     f"[Фактор 2: Критичность] {crit_desc}. "
                     f"[Фактор 3: История] {hist_desc}. "
-                    f"[Фактор 4: Эффективность] Формат {event.format} (+{event.skill_gain} за {event.duration_hours}ч)."
+                    f"[Фактор 4: Эффект активности] Формат {event.format}, прирост +{event.skill_gain}, "
+                    f"потолок {event.max_level}; ожидаемый уровень после выполнения: {projected_level}."
                 )
 
                 scored_candidates.append(
@@ -188,7 +348,7 @@ def calculate_multi_factor_recommendations(
                         title=event.title,
                         target_skill=target_skill,
                         gain=event.skill_gain,
-                        max_level=5,
+                        max_level=event.max_level,
                         score=total_score,
                         rationale=rationale,
                     )
@@ -208,11 +368,19 @@ def calculate_multi_factor_recommendations(
             break
 
     # Attempt LLM-enhancement if API key is provided, otherwise return deterministic rationale
-    return enhance_with_llm_if_available(emp, unique_recommendations)
+    return enhance_with_llm_if_available(
+        emp,
+        unique_recommendations,
+        loader,
+        history_summary=history_summary,
+    )
 
 
 def enhance_with_llm_if_available(
-    emp: EmployeeProfile, recommendations: List[RecommendationItem]
+    emp: EmployeeProfile,
+    recommendations: List[RecommendationItem],
+    loader: DataLoader,
+    history_summary: Optional[ParticipationHistorySummary] = None,
 ) -> List[RecommendationItem]:
     """Enhances deterministic rationale with OpenAI GPT-4o-mini if API key is valid."""
     api_key = os.getenv("OPENAI_API_KEY")
@@ -224,10 +392,16 @@ def enhance_with_llm_if_available(
         client = OpenAI(api_key=api_key, timeout=3.0)
 
         for rec in recommendations:
+            context = build_ai_recommendation_context(
+                emp,
+                rec,
+                loader,
+                history_summary=history_summary,
+            )
             prompt = (
-                f"Сотрудник: {emp.name}, роль: {emp.current_role}, текущий грейд: {emp.current_grade}, "
-                f"целевой грейд: {emp.target_grade}. Мероприятие: '{rec.title}', навык: '{rec.target_skill}', "
-                f"базовое обоснование: '{rec.rationale}'.\n"
+                "Ниже приведён проверенный сервером контекст рекомендации в JSON. "
+                "Используй только эти факты, не придумывай данные.\n"
+                f"{context.model_dump_json(indent=2)}\n"
                 f"Сформулируй краткое, убедительное объяснение (1-2 предложения) для сотрудника от лица Halyk Career AI, "
                 f"почему именно этот шаг критически важен для повышения в грейде."
             )
@@ -420,11 +594,11 @@ def complete_activity(req: CompleteActivityRequest) -> CompleteActivityResponse:
         raise HTTPException(status_code=404, detail=f"Event '{req.event_id}' not found")
 
     skills_updated: List[SkillProgressDiff] = []
-    max_level = 5
+    max_level = event.max_level
 
     for skill in event.target_skills:
         current_level = emp.skills.get(skill, 0)
-        new_level = min(current_level + event.skill_gain, max_level)
+        new_level = max(current_level, min(current_level + event.skill_gain, max_level))
         gain = new_level - current_level
         loader.update_employee_skill(emp.id, skill, new_level)
         skills_updated.append(

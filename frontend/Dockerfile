@@ -1,33 +1,20 @@
 # ==============================================================================
-# Multi-Stage Dockerfile for React/Vite Frontend
-# Stage 1: Build static assets using Node.js
-# Stage 2: Serve high-performance static build with Nginx
+# Single-Stage Lightweight Nginx Container
+# Pure Vanilla HTML/JS + Tailwind CDN (Zero Node.js build overhead)
 # ==============================================================================
 
-# Stage 1: Build
-FROM node:20-alpine AS builder
+FROM nginx:alpine
 
-WORKDIR /app
-
-# Cache package dependencies layer
-COPY package*.json ./
-RUN npm ci --silent || npm install --silent
-
-# Copy source code and build production bundle
-COPY . .
-RUN npm run build
-
-# Stage 2: Production Nginx Server
-FROM nginx:1.25-alpine
+# Remove default static files
+RUN rm -rf /usr/share/nginx/html/*
 
 # Copy custom Nginx configuration with reverse proxy & SPA fallback
 COPY nginx.conf /etc/nginx/conf.d/default.conf
 
-# Copy compiled frontend assets from builder stage
-COPY --from=builder /app/dist /usr/share/nginx/html
+# Copy static frontend files (index.html, assets, scripts)
+COPY . /usr/share/nginx/html
 
-# Expose HTTP port
+# Expose HTTP port 80
 EXPOSE 80
 
-# Run nginx in foreground
 CMD ["nginx", "-g", "daemon off;"]

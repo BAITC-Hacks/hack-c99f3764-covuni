@@ -589,7 +589,7 @@ graph TD
 
 **Команда:** Team 202453 (HackAlem AI)
 
-- **Участник 1 (Alen Pak) — Lead / System Architect, DevOps & Documentation Engineer:**
+- **Alen Pak — Lead / System Architect, DevOps & Documentation Engineer:**
   - Проектирование архитектуры Zero-DB In-Memory слоя.
   - Настройка Docker/Docker Compose окружения, Nginx reverse-proxy и легковесного фронтенда.
   - Разработка модуля динамической загрузки проверочных профилей жюри (`data_loader.py`).

@@ -60,3 +60,6 @@ Thumbs.db
 
 # Docker
 *.docker.log
+
+# Organizer raw archive
+case_1/

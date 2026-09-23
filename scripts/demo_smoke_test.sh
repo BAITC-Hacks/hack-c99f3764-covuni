@@ -93,6 +93,7 @@ PAYLOAD=$(cat <<EOF
         "Python": 4,
         "PostgreSQL": 4,
         "FastAPI": 4,
+        "API Design": 4,
         "Docker": 3,
         "System Design": 2,
         "Kubernetes": 3,
@@ -166,7 +167,7 @@ echo ""
 # STEP 4: Skill Progression Shift & Ceiling Check
 # ------------------------------------------------------------------------------
 echo -e "${C_BOLD}4. Прокачка компетенций: фиксация завершения активности (POST /api/activities/complete)...${C_RESET}"
-ACT_PAYLOAD="{\"employee_id\": \"${CANDIDATE_ID}\", \"event_id\": \"ev_001\"}"
+ACT_PAYLOAD="{\"employee_id\": \"${CANDIDATE_ID}\", \"event_id\": \"EV_005\"}"
 
 T_START=$(python3 -c 'import time; print(int(time.time()*1000))')
 ACT_RESP=$(curl -s -w "\n%{http_code}" -X POST "${BASE_URL}/api/activities/complete" \

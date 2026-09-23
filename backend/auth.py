@@ -38,8 +38,8 @@ class AuthService:
         self.store = store
 
     def create_user(self, username: str, password: str, role: str, employee_id: str | None = None) -> None:
-        if not username.strip() or len(password) < 6 or len(password) > 256:
-            raise ValueError("Username is required; password must be 6–256 characters")
+        if not username.strip() or len(password) < 12 or len(password) > 256:
+            raise ValueError("Username is required; password must be 12–256 characters")
         if role not in {"employee", "hr"} or (role == "employee" and not employee_id):
             raise ValueError("Role must be employee/hr; employee role requires employee_id")
         salt = secrets.token_hex(16)
@@ -96,26 +96,14 @@ def ensure_demo_accounts(store, employee_lookup=None) -> list[str]:
 
     accounts = [
         {
-            "username": os.getenv("DEMO_EMPLOYEE_USERNAME", "demo.employee@halykbank.kz"),
-            "password": os.getenv("DEMO_EMPLOYEE_PASSWORD", "demo123"),
+            "username": os.getenv("DEMO_EMPLOYEE_USERNAME", "demo.employee"),
+            "password": os.getenv("DEMO_EMPLOYEE_PASSWORD", "CareerQuest-Employee-2026!"),
             "role": "employee",
-            "employee_id": os.getenv("DEMO_EMPLOYEE_ID", "E0028"),
+            "employee_id": os.getenv("DEMO_EMPLOYEE_ID", "E0001"),
         },
         {
-            "username": "demo.employee",
-            "password": "demo123",
-            "role": "employee",
-            "employee_id": "E0028",
-        },
-        {
-            "username": os.getenv("DEMO_HR_USERNAME", "hr.manager@halykbank.kz"),
-            "password": os.getenv("DEMO_HR_PASSWORD", "admin123"),
-            "role": "hr",
-            "employee_id": None,
-        },
-        {
-            "username": "hr.manager",
-            "password": "admin123",
+            "username": os.getenv("DEMO_HR_USERNAME", "hr.manager"),
+            "password": os.getenv("DEMO_HR_PASSWORD", "CareerQuest-HR-2026!"),
             "role": "hr",
             "employee_id": None,
         },
@@ -127,22 +115,12 @@ def ensure_demo_accounts(store, employee_lookup=None) -> list[str]:
 
     for account in accounts:
         username = account["username"].strip().lower()
+        if username in existing:
+            continue
         if account["role"] == "employee" and employee_lookup is not None:
             if not account["employee_id"] or employee_lookup(account["employee_id"]) is None:
                 logger.warning("Demo employee account skipped: employee_id=%s was not found", account["employee_id"])
                 continue
-        if username in existing:
-            # Update password hash and employee_id for demo accounts so credentials are synchronized
-            salt = secrets.token_hex(16)
-            digest = password_digest(account["password"], salt)
-            with closing(store._connect()) as conn:
-                conn.execute(
-                    "UPDATE users SET password_hash=?, salt=?, employee_id=?, role=?, failures=0, locked_until=0 WHERE username=?",
-                    (digest, salt, account["employee_id"], account["role"], username)
-                )
-                conn.commit()
-            created.append(username)
-            continue
         try:
             auth.create_user(username, account["password"], account["role"], account["employee_id"])
         except sqlite3.IntegrityError:

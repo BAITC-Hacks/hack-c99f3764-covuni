@@ -549,14 +549,14 @@ graph TD
 
 **Команда:** Team 202453 (HackAlem AI)
 
-- **Участник 1 (Alen Pak) — Lead / System Architect, DevOps & Documentation Engineer:**
+- **Alen Pak — Lead / System Architect, DevOps & Documentation Engineer:**
   - Проектирование архитектуры Zero-DB In-Memory слоя.
   - Настройка Docker/Docker Compose окружения, Nginx reverse-proxy и multi-stage сборок.
   - Разработка модуля динамической загрузки проверочных профилей жюри (`data_loader.py`).
   - Комплексная техническая документация и презентация проекта.
-- **Участник 2 — Backend & ML Engineer:**
+- **Roman Zhukovskiy — Backend & ML Engineer:**
   - Алгоритмическая реализация многофакторного скоринга и учет 24-месячной истории.
   - Интеграция с OpenAI API (GPT-4o-mini) для генерации персонализированных объяснений.
-- **Участник 3 — Frontend & UI/UX Engineer:**
+- **Tatyana Bychkova — Frontend & UI/UX Engineer:**
   - Разработка интерфейса на React/Vite в корпоративном стиле Halyk Bank.
   - Визуализация карьерного трека и радар навыков.

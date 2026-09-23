@@ -41,7 +41,15 @@ from data_loader import (
     get_data_loader,
 )
 from rewards import RewardsStore
-from auth import AuthService, COOKIE_NAME, SESSION_SECONDS, access_middleware, enabled as auth_enabled, request_token
+from auth import (
+    AuthService,
+    COOKIE_NAME,
+    SESSION_SECONDS,
+    access_middleware,
+    enabled as auth_enabled,
+    ensure_demo_accounts,
+    request_token,
+)
 
 load_dotenv(backend_dir.parent / ".env")
 logger = logging.getLogger("career_quest.api")
@@ -593,7 +601,11 @@ def enhance_with_llm_if_available(
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     loader = get_data_loader()
-    get_rewards_store().restore(loader)
+    store = get_rewards_store()
+    store.restore(loader)
+    created_demo_accounts = ensure_demo_accounts(store, loader.get_employee)
+    if created_demo_accounts:
+        logger.info("Created demo accounts: %s", ", ".join(created_demo_accounts))
     yield
 
 

@@ -12,6 +12,7 @@ Core Features:
 
 from __future__ import annotations
 
+import json
 import logging
 import os
 from contextlib import asynccontextmanager
@@ -67,6 +68,19 @@ class RecommendationResponse(BaseModel):
     current_grade: str
     target_grade: str
     recommendations: List[RecommendationItem]
+
+
+class LLMRationaleItem(BaseModel):
+    """One validated explanation returned by the language model."""
+
+    event_id: str
+    rationale: str = Field(min_length=20, max_length=1200)
+
+
+class LLMRationaleResponse(BaseModel):
+    """Structured OpenAI response for all selected recommendations."""
+
+    recommendations: List[LLMRationaleItem] = Field(min_length=1, max_length=3)
 
 
 class CompleteActivityRequest(BaseModel):
@@ -319,41 +333,136 @@ def calculate_multi_factor_recommendations(
         if len(unique_recommendations) >= max_recommendations:
             break
 
-    return enhance_with_llm_if_available(emp, unique_recommendations)
+    return enhance_with_llm_if_available(emp, unique_recommendations, loader)
 
 
 def enhance_with_llm_if_available(
-    emp: EmployeeProfile, recommendations: List[RecommendationItem]
+    emp: EmployeeProfile,
+    recommendations: List[RecommendationItem],
+    loader: DataLoader,
 ) -> List[RecommendationItem]:
-    """Enhances deterministic rationale with OpenAI GPT-4o-mini if API key is valid."""
+    """Enriches all selected recommendations in one bounded OpenAI request.
+
+    The deterministic rationales remain the source of truth and are returned
+    unchanged whenever the API key is missing, OpenAI is unavailable, the
+    request exceeds the timeout, or the structured response is incomplete.
+    """
     api_key = os.getenv("OPENAI_API_KEY")
-    if not api_key or api_key.startswith("your_"):
+    if not recommendations or not api_key or api_key.startswith("your_"):
         return recommendations
 
     try:
         from openai import OpenAI
-        client = OpenAI(api_key=api_key, timeout=3.0)
+
+        preferred_language = (emp.preferred_language or "ru").lower()
+        if preferred_language not in {"ru", "kk", "en"}:
+            preferred_language = "ru"
+
+        grade_requirements = loader.get_grade_requirements(emp.target_role, emp.target_grade)
+        critical_skills = set(loader.get_critical_skills(emp.target_role, emp.target_grade))
+        format_stats = loader.get_employee_format_stats(emp.id)
+        preferred_formats = (
+            emp.preferences.get("preferred_formats", []) if emp.preferences else []
+        )
+
+        candidate_context: List[Dict[str, Any]] = []
+        for rec in recommendations:
+            event = loader.get_event(rec.event_id)
+            event_format = event.format if event else "unknown"
+            normalized_skill = loader.normalize_skill_id(rec.target_skill)
+            current_level = get_emp_skill_level(emp, loader, normalized_skill)
+            required_level = grade_requirements.get(
+                normalized_skill,
+                grade_requirements.get(rec.target_skill, 0),
+            )
+            is_critical = normalized_skill in critical_skills or any(
+                str(skill).lower() in {
+                    normalized_skill.lower(),
+                    rec.target_skill.lower(),
+                }
+                for skill in critical_skills
+            )
+
+            candidate_context.append(
+                {
+                    "event_id": rec.event_id,
+                    "title": rec.title,
+                    "target_skill": rec.target_skill,
+                    "current_level": current_level,
+                    "required_level_for_target_grade": required_level,
+                    "skill_gap": max(0, required_level - current_level),
+                    "critical_for_target_grade": is_critical,
+                    "format": event_format,
+                    "duration_hours": event.duration_hours if event else None,
+                    "format_is_preferred": event_format in preferred_formats,
+                    "history_for_this_format": format_stats.get(event_format, {}),
+                    "gain": rec.gain,
+                    "max_level": rec.max_level,
+                    "projected_level": min(current_level + rec.gain, rec.max_level),
+                    "deterministic_score": rec.score,
+                    "verified_fallback_rationale": rec.rationale,
+                }
+            )
+
+        system_prompt = (
+            "You are Halyk Career AI, a careful career coach. Produce one personalized "
+            "rationale for every supplied recommendation and keep the same event_id values. "
+            "Write only in the employee's preferred language: ru means Russian, kk means "
+            "Kazakh, en means English. Each rationale must be 2-3 natural sentences and "
+            "must explain: the current skill gap and target grade; whether the skill is a "
+            "critical promotion blocker; the employee's completed, dropped, or no-show "
+            "history for this activity format; why this format is suitable; and the exact "
+            "gain and max_level. Praise successful participation when completed is positive, "
+            "and gently warn against another missed or dropped activity when those counts are "
+            "positive. If history is empty, say there is no negative history for the format. "
+            "Never invent facts, events, levels, dates, or history. Do not use markdown and "
+            "do not expose scoring formulas or internal field names."
+        )
+        user_context = {
+            "employee": {
+                "name": emp.name,
+                "current_role": emp.current_role,
+                "current_grade": emp.current_grade,
+                "target_role": emp.target_role,
+                "target_grade": emp.target_grade,
+                "preferred_language": preferred_language,
+                "preferred_formats": preferred_formats,
+            },
+            "recommendations": candidate_context,
+        }
+
+        # One call for all 1-3 cards keeps latency and token usage predictable.
+        client = OpenAI(api_key=api_key, timeout=4.5, max_retries=0)
+        completion = client.chat.completions.parse(
+            model=os.getenv("OPENAI_MODEL", "gpt-4o-mini"),
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {
+                    "role": "user",
+                    "content": json.dumps(user_context, ensure_ascii=False),
+                },
+            ],
+            response_format=LLMRationaleResponse,
+            max_tokens=700,
+            temperature=0.25,
+        )
+        parsed = completion.choices[0].message.parsed
+        if parsed is None:
+            raise ValueError("OpenAI returned no parsed recommendation payload")
+
+        expected_ids = [rec.event_id for rec in recommendations]
+        returned_ids = [item.event_id for item in parsed.recommendations]
+        if len(returned_ids) != len(set(returned_ids)) or set(returned_ids) != set(expected_ids):
+            raise ValueError("OpenAI returned incomplete or unexpected event IDs")
+
+        rationale_by_event = {
+            item.event_id: item.rationale.strip() for item in parsed.recommendations
+        }
+        if any(not rationale_by_event[event_id] for event_id in expected_ids):
+            raise ValueError("OpenAI returned an empty rationale")
 
         for rec in recommendations:
-            prompt = (
-                f"Сотрудник: {emp.name}, роль: {emp.current_role}, текущий грейд: {emp.current_grade}, "
-                f"целевой грейд: {emp.target_grade}. Мероприятие: '{rec.title}', навык: '{rec.target_skill}', "
-                f"базовое обоснование: '{rec.rationale}'.\n"
-                f"Сформулируй краткое, убедительное объяснение (1-2 предложения) для сотрудника от лица Halyk Career AI, "
-                f"почему именно этот шаг критически важен для повышения в грейде."
-            )
-            response = client.chat.completions.create(
-                model=os.getenv("OPENAI_MODEL", "gpt-4o-mini"),
-                messages=[
-                    {"role": "system", "content": "Ты персональный карьерный ассистент Halyk Bank."},
-                    {"role": "user", "content": prompt},
-                ],
-                max_tokens=100,
-                temperature=0.3,
-            )
-            llm_text = response.choices[0].message.content.strip()
-            if llm_text:
-                rec.rationale = f"{llm_text} | {rec.rationale}"
+            rec.rationale = rationale_by_event[rec.event_id]
     except Exception as e:
         logger.warning("LLM explanation enrichment skipped (using deterministic fallback): %s", e)
 
@@ -612,3 +721,4 @@ def get_skills_matrix():
         "skills": list(loader._skills_catalog.values()),
         "grade_requirements": loader._grade_requirements,
     }
+

@@ -1,8 +1,4 @@
 node_modules/
 dist/
-Dockerfile
-package*.json
-vite.config.js
-src/
 .git
 .DS_Store

@@ -1,20 +1,34 @@
 # ==============================================================================
-# Single-Stage Lightweight Nginx Container
-# Pure Vanilla HTML/JS + Tailwind CDN (Zero Node.js build overhead)
+# Multi-Stage Dockerfile for Frontend (TypeScript + Vite + Tailwind)
+# Stage 1: Build static assets using Node.js 22 & pnpm 11
+# Stage 2: Serve high-performance static build with Nginx
 # ==============================================================================
 
-FROM nginx:alpine
+# Stage 1: Build
+FROM node:22-alpine AS builder
 
-# Remove default static files
-RUN rm -rf /usr/share/nginx/html/*
+WORKDIR /app
+
+# Cache package dependencies layer
+COPY package.json pnpm-lock.yaml ./
+RUN corepack enable && corepack prepare pnpm@11.19.0 --activate \
+    && pnpm install --frozen-lockfile --ignore-scripts
+
+# Copy source code and build production bundle
+COPY . .
+RUN pnpm run build
+
+# Stage 2: Production Nginx Server
+FROM nginx:1.25-alpine
 
 # Copy custom Nginx configuration with reverse proxy & SPA fallback
 COPY nginx.conf /etc/nginx/conf.d/default.conf
 
-# Copy static frontend files (index.html, assets, scripts)
-COPY . /usr/share/nginx/html
+# Copy compiled frontend assets from builder stage
+COPY --from=builder /app/dist /usr/share/nginx/html
 
-# Expose HTTP port 80
+# Expose HTTP port
 EXPOSE 80
 
+# Run nginx in foreground
 CMD ["nginx", "-g", "daemon off;"]

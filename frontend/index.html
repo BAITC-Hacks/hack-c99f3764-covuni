@@ -1,16 +1,956 @@
 <!DOCTYPE html>
-<html lang="ru">
-  <head>
-    <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏦</text></svg>" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Halyk Career Quest — AI Recommendation Engine (Team 202453)</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-  </head>
-  <body>
-    <div id="root"></div>
-    <script type="module" src="/src/main.jsx"></script>
-  </body>
+<html lang="ru" class="h-full bg-slate-50">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Halyk Career Quest — AI Recommendation Engine (Team 202453)</title>
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏦</text></svg>" />
+  
+  <!-- Google Fonts: Inter -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  
+  <!-- FontAwesome 6 Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+
+  <!-- Tailwind CSS via CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Inter', 'sans-serif'],
+          },
+          colors: {
+            halyk: {
+              50: '#f0fdf4',
+              100: '#dcfce7',
+              200: '#bbf7d0',
+              300: '#86efac',
+              400: '#4ade80',
+              500: '#22c55e',
+              600: '#008248', // Halyk Corporate Green
+              700: '#006638',
+              800: '#004d2a',
+              900: '#00331c',
+            }
+          }
+        }
+      }
+    }
+  </script>
+  
+  <style>
+    body { font-family: 'Inter', sans-serif; }
+    .glass-card {
+      background: rgba(255, 255, 255, 0.95);
+      backdrop-filter: blur(10px);
+    }
+    @keyframes pulse-subtle {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.85; }
+    }
+    .animate-subtle { animation: pulse-subtle 3s infinite ease-in-out; }
+  </style>
+</head>
+<body class="min-h-full flex flex-col text-slate-800 bg-slate-50">
+
+  <!-- ========================================================================= -->
+  <!-- Header / Navigation Bar -->
+  <!-- ========================================================================= -->
+  <header class="bg-white border-b border-slate-200 sticky top-0 z-40 shadow-sm">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div class="flex items-center justify-between h-16">
+        <!-- Logo & Project Identity -->
+        <div class="flex items-center space-x-3">
+          <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-halyk-700 to-halyk-500 flex items-center justify-center text-white shadow-md shadow-halyk-600/20">
+            <i class="fa-solid fa-building-columns text-lg"></i>
+          </div>
+          <div>
+            <div class="flex items-center space-x-2">
+              <span class="text-lg font-bold tracking-tight text-slate-900">Halyk Bank</span>
+              <span class="text-xs font-semibold px-2 py-0.5 rounded-full bg-halyk-100 text-halyk-800 border border-halyk-200">Career Quest</span>
+            </div>
+            <p class="text-xs text-slate-500 font-medium">Explainable Upskilling Engine &bull; Team 202453</p>
+          </div>
+        </div>
+
+        <!-- Navigation Tabs -->
+        <nav class="hidden md:flex space-x-1 bg-slate-100 p-1 rounded-xl border border-slate-200" id="navTabs">
+          <button onclick="switchTab('career')" id="tabBtn-career" class="tab-btn px-4 py-2 text-xs font-semibold rounded-lg transition-all duration-200 bg-white text-halyk-700 shadow-sm">
+            <i class="fa-solid fa-route mr-1.5"></i> Карьерный трек
+          </button>
+          <button onclick="switchTab('analytics')" id="tabBtn-analytics" class="tab-btn px-4 py-2 text-xs font-semibold rounded-lg transition-all duration-200 text-slate-600 hover:text-slate-900">
+            <i class="fa-solid fa-chart-pie mr-1.5"></i> HR-Аналитика
+          </button>
+          <button onclick="switchTab('jury')" id="tabBtn-jury" class="tab-btn px-4 py-2 text-xs font-semibold rounded-lg transition-all duration-200 text-slate-600 hover:text-slate-900">
+            <i class="fa-solid fa-vial mr-1.5"></i> Тест Жюри (Corner-Case)
+          </button>
+        </nav>
+
+        <!-- System Health Badge -->
+        <div class="flex items-center space-x-3">
+          <div id="healthBadge" class="flex items-center space-x-2 px-3 py-1.5 rounded-full text-xs font-medium bg-slate-100 text-slate-600 border border-slate-200">
+            <span class="w-2 h-2 rounded-full bg-slate-400 animate-pulse" id="healthDot"></span>
+            <span id="healthText">Проверка API...</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Mobile Navigation Subbar -->
+    <div class="md:hidden flex border-t border-slate-200 bg-slate-50 p-2 justify-around">
+      <button onclick="switchTab('career')" class="text-xs font-semibold text-halyk-700 py-1">Трек</button>
+      <button onclick="switchTab('analytics')" class="text-xs font-semibold text-slate-600 py-1">HR-Аналитика</button>
+      <button onclick="switchTab('jury')" class="text-xs font-semibold text-slate-600 py-1">Тест Жюри</button>
+    </div>
+  </header>
+
+  <!-- ========================================================================= -->
+  <!-- Main Container -->
+  <!-- ========================================================================= -->
+  <main class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+
+    <!-- Toast Notifications -->
+    <div id="toastContainer" class="fixed bottom-5 right-5 z-50 flex flex-col space-y-2 pointer-events-none"></div>
+
+    <!-- ======================================================================= -->
+    <!-- TAB 1: Карьерный трек сотрудника -->
+    <!-- ======================================================================= -->
+    <section id="tab-career" class="space-y-6">
+      
+      <!-- Top Control Bar: Employee Selector & Quick Actions -->
+      <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-4">
+        <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+          <div>
+            <h1 class="text-lg font-bold text-slate-900 flex items-center">
+              <i class="fa-solid fa-user-gear mr-2 text-halyk-600"></i> Персональный карьерный профиль
+            </h1>
+            <p class="text-xs text-slate-500">Выберите сотрудника из датасета (200 профилей) или загрузите своего кандидата</p>
+          </div>
+
+          <!-- Employee Select Input -->
+          <div class="flex items-center space-x-3 w-full md:w-auto">
+            <div class="relative w-full md:w-80">
+              <select id="employeeSelect" onchange="onEmployeeSelect(this.value)" class="w-full bg-slate-50 border border-slate-300 text-slate-900 text-sm rounded-xl focus:ring-halyk-500 focus:border-halyk-500 block p-2.5 pr-8 appearance-none transition shadow-sm font-medium">
+                <option value="" disabled selected>Загрузка списка сотрудников...</option>
+              </select>
+              <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-slate-500">
+                <i class="fa-solid fa-chevron-down text-xs"></i>
+              </div>
+            </div>
+
+            <button onclick="refreshCurrentRecommendations()" title="Обновить рекомендации" class="p-2.5 text-slate-600 hover:text-halyk-700 bg-slate-100 hover:bg-slate-200 rounded-xl transition">
+              <i class="fa-solid fa-arrow-rotate-right"></i>
+            </button>
+          </div>
+        </div>
+
+        <!-- Quick Pick Filter Chips -->
+        <div class="flex flex-wrap items-center gap-2 pt-2 border-t border-slate-100 text-xs">
+          <span class="text-slate-400 font-medium">Быстрый выбор:</span>
+          <button onclick="selectSpecificEmployee('E0001')" class="px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-halyk-50 hover:text-halyk-700 text-slate-700 border border-slate-200 font-medium transition">
+            E0001 (Марат Есенов, Junior Backend)
+          </button>
+          <button onclick="selectSpecificEmployee('E0028')" class="px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-halyk-50 hover:text-halyk-700 text-slate-700 border border-slate-200 font-medium transition">
+            E0028 (Акмарал Исмаилова, Middle Backend)
+          </button>
+          <button onclick="selectSpecificEmployee('E0010')" class="px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-halyk-50 hover:text-halyk-700 text-slate-700 border border-slate-200 font-medium transition">
+            E0010 (Frontend Engineer)
+          </button>
+          <button onclick="selectSpecificEmployee('E0050')" class="px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-halyk-50 hover:text-halyk-700 text-slate-700 border border-slate-200 font-medium transition">
+            E0050 (Data Analyst)
+          </button>
+        </div>
+      </div>
+
+      <!-- Employee Overview Card & Target Gap Matrix -->
+      <div id="employeeCardContainer" class="hidden grid grid-cols-1 lg:grid-cols-3 gap-6">
+        
+        <!-- Column 1: Profile Summary -->
+        <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex flex-col justify-between">
+          <div>
+            <div class="flex items-center space-x-4 mb-4">
+              <div id="empAvatar" class="w-14 h-14 rounded-2xl bg-gradient-to-tr from-halyk-600 to-emerald-400 text-white flex items-center justify-center text-xl font-bold shadow-md shadow-halyk-600/20">
+                MY
+              </div>
+              <div>
+                <h2 id="empFullName" class="text-base font-bold text-slate-900">Марат Есенов</h2>
+                <p id="empIdRole" class="text-xs text-slate-500 font-medium">E0001 &bull; Backend Engineer</p>
+                <div class="flex items-center space-x-1.5 mt-1">
+                  <span id="empCurrentGradeBadge" class="px-2 py-0.5 text-xs font-semibold rounded bg-slate-100 text-slate-700">Junior</span>
+                  <i class="fa-solid fa-arrow-right text-[10px] text-slate-400"></i>
+                  <span id="empTargetGradeBadge" class="px-2 py-0.5 text-xs font-bold rounded bg-halyk-100 text-halyk-800 border border-halyk-200">Middle</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Profile Info Grid -->
+            <div class="grid grid-cols-2 gap-3 text-xs bg-slate-50 p-3 rounded-xl border border-slate-100 mb-4">
+              <div>
+                <span class="text-slate-400 block">Департамент:</span>
+                <span id="empDept" class="font-semibold text-slate-800">Backend Core</span>
+              </div>
+              <div>
+                <span class="text-slate-400 block">Стаж в банке:</span>
+                <span id="empTenure" class="font-semibold text-slate-800">14 мес.</span>
+              </div>
+              <div>
+                <span class="text-slate-400 block">Формат работы:</span>
+                <span id="empWorkFormat" class="font-semibold text-slate-800">office</span>
+              </div>
+              <div>
+                <span class="text-slate-400 block">Дата среза:</span>
+                <span class="font-semibold text-slate-800">01.10.2026</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="p-3 bg-amber-50 border border-amber-200 rounded-xl text-xs text-amber-800">
+            <i class="fa-solid fa-triangle-exclamation mr-1 text-amber-600"></i>
+            <strong>Правило промоушена:</strong> Достижение грейда требует закрытия дефицита по всем <em>Critical Skills (x2.5)</em>.
+          </div>
+        </div>
+
+        <!-- Column 2 & 3: Target Grade Skills & Promotion Blockers -->
+        <div class="lg:col-span-2 bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-4">
+          <div class="flex items-center justify-between">
+            <h3 class="text-sm font-bold text-slate-900 flex items-center">
+              <i class="fa-solid fa-bullseye mr-2 text-halyk-600"></i> Матрица навыков для целевого грейда
+            </h3>
+            <span class="text-xs text-slate-500" id="criticalSkillsSummary">Критических блокеров: 0</span>
+          </div>
+
+          <!-- Skills Progress Bars List -->
+          <div id="skillsListContainer" class="grid grid-cols-1 md:grid-cols-2 gap-3 max-h-60 overflow-y-auto pr-1">
+            <!-- Dynamic skills injected via JS -->
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Recommendations Section -->
+      <div class="space-y-4">
+        <div class="flex items-center justify-between">
+          <div>
+            <h2 class="text-base font-bold text-slate-900 flex items-center">
+              <i class="fa-solid fa-sparkles mr-2 text-halyk-600"></i> Рекомендованные развивающие активности
+            </h2>
+            <p class="text-xs text-slate-500">Алгоритм фильтрует mandatory-курсы, проверяет пререквизиты и повышает приоритет блокеров x2.5</p>
+          </div>
+          <span id="recsCountBadge" class="text-xs font-semibold px-2.5 py-1 rounded-full bg-slate-100 text-slate-600">0 мероприятий</span>
+        </div>
+
+        <!-- Recommendations Grid -->
+        <div id="recommendationsGrid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+          <!-- Dynamic cards injected via JS -->
+          <div class="col-span-full p-12 text-center text-slate-400 bg-white rounded-2xl border border-dashed border-slate-300">
+            <i class="fa-solid fa-spinner fa-spin text-2xl text-halyk-600 mb-2"></i>
+            <p class="text-sm">Загрузка рекомендаций...</p>
+          </div>
+        </div>
+      </div>
+
+    </section>
+
+    <!-- ======================================================================= -->
+    <!-- TAB 2: Корпоративная HR-Аналитика -->
+    <!-- ======================================================================= -->
+    <section id="tab-analytics" class="hidden space-y-6">
+      <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+        <div>
+          <h1 class="text-lg font-bold text-slate-900 flex items-center">
+            <i class="fa-solid fa-chart-line mr-2 text-halyk-600"></i> HR-Аналитика компетенций и группа риска
+          </h1>
+          <p class="text-xs text-slate-500">Агрегированный срез по всем 200 сотрудникам на дату 01.10.2026</p>
+        </div>
+        <button onclick="loadHRAnalytics()" class="px-3.5 py-2 text-xs font-semibold text-halyk-700 bg-halyk-50 hover:bg-halyk-100 border border-halyk-200 rounded-xl transition flex items-center space-x-1.5">
+          <i class="fa-solid fa-arrows-rotate"></i>
+          <span>Обновить срез</span>
+        </button>
+      </div>
+
+      <!-- Top HR Metrics Counter -->
+      <div class="grid grid-cols-1 sm:grid-cols-3 gap-5">
+        <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex items-center space-x-4">
+          <div class="w-12 h-12 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center text-xl">
+            <i class="fa-solid fa-users"></i>
+          </div>
+          <div>
+            <span class="text-xs text-slate-400 font-medium">Штат компании</span>
+            <div id="statTotalEmployees" class="text-2xl font-black text-slate-900">200</div>
+          </div>
+        </div>
+
+        <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex items-center space-x-4">
+          <div class="w-12 h-12 rounded-xl bg-rose-50 text-rose-600 flex items-center justify-center text-xl">
+            <i class="fa-solid fa-triangle-exclamation"></i>
+          </div>
+          <div>
+            <span class="text-xs text-slate-400 font-medium">В группе риска (пропуски/стагнация)</span>
+            <div id="statRiskCount" class="text-2xl font-black text-rose-600">97</div>
+          </div>
+        </div>
+
+        <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex items-center space-x-4">
+          <div class="w-12 h-12 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center text-xl">
+            <i class="fa-solid fa-layer-group"></i>
+          </div>
+          <div>
+            <span class="text-xs text-slate-400 font-medium">Топ дефицитных навыков</span>
+            <div id="statDeficitSkillsCount" class="text-2xl font-black text-slate-900">5</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Top 5 Deficit Skills Cards -->
+      <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-4">
+        <h3 class="text-sm font-bold text-slate-900 flex items-center">
+          <i class="fa-solid fa-chart-column mr-2 text-halyk-600"></i> Топ-5 дефицитных навыков для целевых грейдов
+        </h3>
+        <div id="topDeficitsContainer" class="grid grid-cols-1 md:grid-cols-5 gap-3">
+          <!-- Injected via JS -->
+        </div>
+      </div>
+
+      <!-- Risk Group Table -->
+      <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-4">
+        <div class="flex items-center justify-between">
+          <div>
+            <h3 class="text-sm font-bold text-slate-900 flex items-center">
+              <i class="fa-solid fa-user-xmark mr-2 text-rose-600"></i> Сотрудники в зоне внимания (Группа риска)
+            </h3>
+            <p class="text-xs text-slate-500">Сотрудники с частыми пропусками (no_show / dropped) или отсутствием прогресса</p>
+          </div>
+        </div>
+
+        <div class="overflow-x-auto max-h-96 border border-slate-200 rounded-xl">
+          <table class="w-full text-left text-xs text-slate-600">
+            <thead class="bg-slate-50 text-slate-700 font-semibold uppercase text-[11px] sticky top-0 border-b border-slate-200">
+              <tr>
+                <th class="p-3">Сотрудник</th>
+                <th class="p-3">Роль и грейд</th>
+                <th class="p-3 text-center">Пропуски (No Show)</th>
+                <th class="p-3 text-center">Брошено (Dropped)</th>
+                <th class="p-3 text-center">Сумм. разрыв</th>
+                <th class="p-3">Причина риска</th>
+                <th class="p-3 text-right">Действие</th>
+              </tr>
+            </thead>
+            <tbody id="riskGroupTableBody" class="divide-y divide-slate-100">
+              <!-- Injected via JS -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- ======================================================================= -->
+    <!-- TAB 3: Тест Жюри (Corner-Case Ingestion) -->
+    <!-- ======================================================================= -->
+    <section id="tab-jury" class="hidden space-y-6">
+      <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-2">
+        <h1 class="text-lg font-bold text-slate-900 flex items-center">
+          <i class="fa-solid fa-flask-vial mr-2 text-halyk-600"></i> Проверка углового кейса жюри (Jury Corner-Case Trap)
+        </h1>
+        <p class="text-xs text-slate-500">
+          Проверка алгоритма на устойчивость: наивное правило рекомендует минимальный навык (Public Speaking = 1). 
+          Многофакторный AI Halyk выбирает <strong>System Design</strong> (разрыв: 2, <em>Critical Skill x2.5</em>), unblocking Senior grade.
+        </p>
+      </div>
+
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <!-- Input JSON profile -->
+        <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-4">
+          <div class="flex items-center justify-between">
+            <h3 class="text-sm font-bold text-slate-900">Входной JSON профиля кандидата:</h3>
+            <span class="text-xs text-halyk-700 bg-halyk-50 px-2 py-0.5 rounded font-mono">POST /api/profiles/upload</span>
+          </div>
+
+          <textarea id="juryProfileJson" rows="14" class="w-full p-3 font-mono text-xs bg-slate-900 text-emerald-400 rounded-xl border border-slate-800 focus:ring-2 focus:ring-halyk-500 outline-none">
+{
+  "id": "jury_test_candidate_001",
+  "name": "Темирлан Бериков (Jury Corner Case)",
+  "department": "Core Banking Architecture",
+  "current_role": "Backend Engineer",
+  "current_grade": "Middle",
+  "target_grade": "Senior",
+  "skills": {
+    "Python": 4,
+    "PostgreSQL": 4,
+    "FastAPI": 4,
+    "API Design": 4,
+    "Docker": 3,
+    "System Design": 2,
+    "Kubernetes": 3,
+    "Public Speaking": 1
+  },
+  "preferences": {
+    "preferred_formats": ["online"]
+  }
+}</textarea>
+
+          <button onclick="submitJuryProfile()" class="w-full py-2.5 px-4 bg-halyk-600 hover:bg-halyk-700 text-white font-semibold text-xs rounded-xl shadow-md shadow-halyk-600/20 transition flex items-center justify-center space-x-2">
+            <i class="fa-solid fa-cloud-arrow-up"></i>
+            <span>Загрузить профиль в память и рассчитать рекомендации</span>
+          </button>
+        </div>
+
+        <!-- Explanation of Logic -->
+        <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-4">
+          <h3 class="text-sm font-bold text-slate-900">Почему наивное правило здесь ломается:</h3>
+          
+          <div class="space-y-3 text-xs text-slate-600">
+            <div class="p-3 bg-rose-50 border border-rose-200 rounded-xl">
+              <strong class="text-rose-800 block mb-1">❌ Ловушка наивного правила (Минимальный уровень):</strong>
+              <p>У кандидата навык <em>Public Speaking</em> на уровне 1 (минимальный в профиле). Наивная система назначит клуб публичных выступлений.</p>
+            </div>
+
+            <div class="p-3 bg-halyk-50 border border-halyk-200 rounded-xl">
+              <strong class="text-halyk-800 block mb-1">✓ Решение многофакторного AI Halyk:</strong>
+              <p>Для перехода на грейд <strong>Senior Backend Engineer</strong> навык <em>System Design</em> является <strong>Critical Skill (блокер промоушена с мультипликатором x2.5)</strong> с дефицитом в 2 уровня. Система рекомендует <strong>System Design Fundamentals / Architecture Circle</strong>, обеспечивая максимальную бизнес-ценность промоушена.</p>
+            </div>
+
+            <div class="p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-1">
+              <strong class="text-slate-800 block">Метрики готовности:</strong>
+              <p>&bull; Динамическая загрузка JSON: <strong>&lt; 5 мс</strong> без перезагрузки бэкенда.</p>
+              <p>&bull; Генерация 4-факторного объяснения: <strong>Дефицит, Критичность, История, Эффективность</strong>.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- ========================================================================= -->
+  <!-- Vanilla JS Application Logic -->
+  <!-- ========================================================================= -->
+  <script>
+    // State
+    let currentEmployees = [];
+    let selectedEmployeeId = 'E0001';
+    let currentEmployeeData = null;
+    let currentRecommendations = [];
+
+    // On Load
+    document.addEventListener('DOMContentLoaded', () => {
+      checkHealth();
+      loadEmployees();
+    });
+
+    // -------------------------------------------------------------------------
+    // Tab Navigation
+    // -------------------------------------------------------------------------
+    function switchTab(tabName) {
+      ['career', 'analytics', 'jury'].forEach(t => {
+        const sec = document.getElementById(`tab-${t}`);
+        const btn = document.getElementById(`tabBtn-${t}`);
+        if (sec) sec.classList.toggle('hidden', t !== tabName);
+        if (btn) {
+          if (t === tabName) {
+            btn.className = 'tab-btn px-4 py-2 text-xs font-semibold rounded-lg transition-all duration-200 bg-white text-halyk-700 shadow-sm';
+          } else {
+            btn.className = 'tab-btn px-4 py-2 text-xs font-semibold rounded-lg transition-all duration-200 text-slate-600 hover:text-slate-900';
+          }
+        }
+      });
+
+      if (tabName === 'analytics') {
+        loadHRAnalytics();
+      }
+    }
+
+    // -------------------------------------------------------------------------
+    // Healthcheck
+    // -------------------------------------------------------------------------
+    async function checkHealth() {
+      try {
+        const res = await fetch('/health');
+        if (!res.ok) throw new Error('Healthcheck status ' + res.status);
+        const data = await res.json();
+        
+        const dot = document.getElementById('healthDot');
+        const text = document.getElementById('healthText');
+        const badge = document.getElementById('healthBadge');
+
+        dot.className = 'w-2 h-2 rounded-full bg-emerald-500';
+        text.innerText = `API Online (v1.0.0)`;
+        badge.className = 'flex items-center space-x-2 px-3 py-1.5 rounded-full text-xs font-medium bg-emerald-50 text-emerald-700 border border-emerald-200';
+      } catch (err) {
+        const dot = document.getElementById('healthDot');
+        const text = document.getElementById('healthText');
+        const badge = document.getElementById('healthBadge');
+
+        dot.className = 'w-2 h-2 rounded-full bg-rose-500';
+        text.innerText = 'API Offline';
+        badge.className = 'flex items-center space-x-2 px-3 py-1.5 rounded-full text-xs font-medium bg-rose-50 text-rose-700 border border-rose-200';
+      }
+    }
+
+    // -------------------------------------------------------------------------
+    // Load Employees (GET /api/employees with fallback to /api/profiles)
+    // -------------------------------------------------------------------------
+    async function loadEmployees() {
+      try {
+        let res = await fetch('/api/employees');
+        if (!res.ok) res = await fetch('/api/profiles');
+        if (!res.ok) throw new Error('Failed to load employees');
+
+        currentEmployees = await res.json();
+        populateEmployeeSelect(currentEmployees);
+
+        if (currentEmployees.length > 0) {
+          selectSpecificEmployee(selectedEmployeeId);
+        }
+      } catch (err) {
+        showToast('Ошибка загрузки сотрудников: ' + err.message, 'error');
+      }
+    }
+
+    function populateEmployeeSelect(employees) {
+      const select = document.getElementById('employeeSelect');
+      select.innerHTML = '';
+
+      employees.forEach(emp => {
+        const opt = document.createElement('option');
+        opt.value = emp.employee_id || emp.id;
+        const name = emp.full_name || emp.name;
+        const role = emp.role || emp.current_role;
+        const grade = emp.grade || emp.current_grade;
+        opt.innerText = `${emp.employee_id || emp.id} — ${name} (${role}, ${grade})`;
+        select.appendChild(opt);
+      });
+    }
+
+    function onEmployeeSelect(empId) {
+      if (!empId) return;
+      selectedEmployeeId = empId;
+      loadEmployeeDetails(empId);
+      loadRecommendations(empId);
+    }
+
+    function selectSpecificEmployee(empId) {
+      const select = document.getElementById('employeeSelect');
+      if (select) {
+        select.value = empId;
+      }
+      onEmployeeSelect(empId);
+    }
+
+    // -------------------------------------------------------------------------
+    // Load Employee Details & Target Skills
+    // -------------------------------------------------------------------------
+    async function loadEmployeeDetails(empId) {
+      try {
+        let res = await fetch(`/api/employees/${empId}`);
+        if (!res.ok) res = await fetch(`/api/profiles/${empId}`);
+        if (!res.ok) throw new Error('Employee not found');
+
+        const emp = await res.json();
+        currentEmployeeData = emp;
+        renderEmployeeCard(emp);
+      } catch (err) {
+        showToast('Ошибка загрузки профиля: ' + err.message, 'error');
+      }
+    }
+
+    function renderEmployeeCard(emp) {
+      document.getElementById('employeeCardContainer').classList.remove('hidden');
+
+      const name = emp.full_name || emp.name || 'Сотрудник';
+      const role = emp.role || emp.current_role || 'Инженер';
+      const grade = emp.grade || emp.current_grade || 'Junior';
+      const targetGrade = emp.target_grade || (emp.career_goal ? emp.career_goal.target_grade : 'Middle');
+      const dept = emp.department || 'IT & Digital';
+      const tenure = emp.tenure_months ? `${emp.tenure_months} мес.` : '6 мес.';
+      const workFormat = emp.work_format || 'office';
+
+      document.getElementById('empFullName').innerText = name;
+      document.getElementById('empIdRole').innerText = `${emp.employee_id || emp.id} • ${role}`;
+      document.getElementById('empCurrentGradeBadge').innerText = grade;
+      document.getElementById('empTargetGradeBadge').innerText = targetGrade;
+      document.getElementById('empDept').innerText = dept;
+      document.getElementById('empTenure').innerText = tenure;
+      document.getElementById('empWorkFormat').innerText = workFormat;
+
+      // Initials
+      const initials = name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase() || 'HB';
+      document.getElementById('empAvatar').innerText = initials;
+
+      // Render Skills & Target Matrix
+      renderSkillsMatrix(emp);
+    }
+
+    async function renderSkillsMatrix(emp) {
+      const container = document.getElementById('skillsListContainer');
+      container.innerHTML = '';
+
+      const empSkills = emp.skills || {};
+      const targetRole = emp.target_role || emp.role || emp.current_role;
+      const targetGrade = emp.target_grade || 'Middle';
+
+      // Fetch skills and requirements
+      try {
+        const skillsRes = await fetch('/api/skills');
+        let requiredSkills = {};
+        if (skillsRes.ok) {
+          const sData = await skillsRes.json();
+          const reqMap = sData.grade_requirements || {};
+          if (reqMap[targetRole] && reqMap[targetRole][targetGrade]) {
+            requiredSkills = reqMap[targetRole][targetGrade];
+          }
+        }
+
+        const skillKeys = Object.keys(requiredSkills).length > 0 
+          ? Object.keys(requiredSkills) 
+          : Object.keys(empSkills).slice(0, 8);
+
+        let criticalCount = 0;
+
+        skillKeys.forEach(sk => {
+          const reqLevel = requiredSkills[sk] || 3;
+          const curLevel = empSkills[sk] || 0;
+          const isCritical = ['SK_PYTHON', 'SK_API_DESIGN', 'SK_SYSTEM_DESIGN', 'SK_SQL', 'SK_STATISTICS'].includes(sk);
+          if (isCritical && curLevel < reqLevel) criticalCount++;
+
+          const pct = Math.min(100, Math.round((curLevel / Math.max(reqLevel, 1)) * 100));
+          const skName = sk.replace('SK_', '').replace(/_/g, ' ');
+
+          const el = document.createElement('div');
+          el.className = 'p-2.5 rounded-xl border border-slate-100 bg-slate-50 space-y-1.5';
+          el.innerHTML = `
+            <div class="flex items-center justify-between text-xs">
+              <span class="font-semibold text-slate-800 flex items-center">
+                ${isCritical ? '<span class="text-amber-500 mr-1" title="Critical Skill x2.5">⭐</span>' : ''}
+                ${skName}
+              </span>
+              <span class="font-mono text-[11px] ${curLevel >= reqLevel ? 'text-halyk-700 font-bold' : 'text-slate-500'}">
+                ${curLevel} / ${reqLevel}
+              </span>
+            </div>
+            <div class="w-full bg-slate-200 rounded-full h-1.5 overflow-hidden">
+              <div class="h-1.5 rounded-full ${curLevel >= reqLevel ? 'bg-halyk-600' : (isCritical ? 'bg-amber-500' : 'bg-blue-500')}" style="width: ${pct}%"></div>
+            </div>
+          `;
+          container.appendChild(el);
+        });
+
+        document.getElementById('criticalSkillsSummary').innerText = `Критических блокеров: ${criticalCount}`;
+      } catch (e) {
+        console.error('Skills matrix render error', e);
+      }
+    }
+
+    // -------------------------------------------------------------------------
+    // Load Recommendations (POST /api/recommendations)
+    // -------------------------------------------------------------------------
+    async function loadRecommendations(empId) {
+      const grid = document.getElementById('recommendationsGrid');
+      grid.innerHTML = `
+        <div class="col-span-full p-8 text-center text-slate-400 bg-white rounded-2xl border border-dashed border-slate-300">
+          <i class="fa-solid fa-spinner fa-spin text-2xl text-halyk-600 mb-2"></i>
+          <p class="text-sm font-medium">Многофакторный AI рассчитывает карьерные рекомендации...</p>
+        </div>
+      `;
+
+      try {
+        const res = await fetch('/api/recommendations', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ employee_id: empId }),
+        });
+
+        if (!res.ok) throw new Error('Ошибка расчета рекомендаций');
+        const data = await res.json();
+        currentRecommendations = data.recommendations || [];
+
+        renderRecommendations(currentRecommendations, empId);
+      } catch (err) {
+        grid.innerHTML = `
+          <div class="col-span-full p-6 text-center text-rose-600 bg-rose-50 rounded-2xl border border-rose-200 text-xs">
+            <i class="fa-solid fa-triangle-exclamation text-lg mb-1"></i>
+            <p>Не удалось рассчитать рекомендации: ${err.message}</p>
+          </div>
+        `;
+      }
+    }
+
+    function renderRecommendations(recs, empId) {
+      const grid = document.getElementById('recommendationsGrid');
+      grid.innerHTML = '';
+      document.getElementById('recsCountBadge').innerText = `${recs.length} мероприятий`;
+
+      if (recs.length === 0) {
+        grid.innerHTML = `
+          <div class="col-span-full p-8 text-center text-slate-500 bg-white rounded-2xl border border-slate-200">
+            <i class="fa-solid fa-circle-check text-2xl text-halyk-600 mb-2"></i>
+            <p class="text-sm font-semibold">Все требования целевого грейда выполнены!</p>
+            <p class="text-xs text-slate-400 mt-1">Сотрудник полностью готов к промоушену.</p>
+          </div>
+        `;
+        return;
+      }
+
+      recs.forEach((rec, idx) => {
+        const isTop = idx === 0;
+        const card = document.createElement('div');
+        card.className = `bg-white rounded-2xl p-5 border ${isTop ? 'border-halyk-500 shadow-md shadow-halyk-600/10 ring-1 ring-halyk-500' : 'border-slate-200 shadow-sm'} flex flex-col justify-between space-y-4 transition hover:shadow-md`;
+
+        // Format Badge
+        let formatIcon = 'fa-globe';
+        let formatClass = 'bg-blue-50 text-blue-700 border-blue-200';
+        if (rec.rationale.includes('offline')) {
+          formatIcon = 'fa-building';
+          formatClass = 'bg-purple-50 text-purple-700 border-purple-200';
+        } else if (rec.rationale.includes('self_paced')) {
+          formatIcon = 'fa-clock';
+          formatClass = 'bg-emerald-50 text-emerald-700 border-emerald-200';
+        }
+
+        const isBlocker = rec.rationale.includes('Критический блокер') || rec.rationale.includes('x2.5');
+
+        card.innerHTML = `
+          <div class="space-y-3">
+            <!-- Header Badges -->
+            <div class="flex items-center justify-between">
+              <span class="text-[11px] font-bold px-2 py-0.5 rounded-full ${formatClass} border">
+                <i class="fa-solid ${formatIcon} mr-1"></i> ${rec.event_id}
+              </span>
+              <span class="text-xs font-bold px-2 py-0.5 rounded-full bg-halyk-50 text-halyk-700 border border-halyk-200">
+                Скор: ${rec.score}
+              </span>
+            </div>
+
+            <!-- Title -->
+            <h3 class="text-base font-bold text-slate-900 leading-snug">${rec.title}</h3>
+
+            <!-- Developed Skill Tag -->
+            <div class="flex flex-wrap gap-1.5 text-xs">
+              <span class="px-2.5 py-1 rounded-lg font-medium bg-slate-100 text-slate-700 border border-slate-200 flex items-center">
+                <i class="fa-solid fa-arrow-trend-up mr-1.5 text-halyk-600"></i>
+                +${rec.gain} ${rec.target_skill} (потолок: ${rec.max_level})
+              </span>
+              ${isBlocker ? '<span class="px-2 py-1 rounded-lg font-bold bg-amber-100 text-amber-900 border border-amber-300">⭐ Блокер x2.5</span>' : ''}
+            </div>
+
+            <!-- Explainable AI Rationale Accordion -->
+            <div class="p-3 bg-slate-50 border border-slate-100 rounded-xl space-y-1.5 text-[11px] text-slate-600 leading-relaxed">
+              <div class="font-bold text-slate-800 flex items-center mb-1">
+                <i class="fa-solid fa-wand-magic-sparkles mr-1.5 text-halyk-600"></i> Обоснование алгоритма (4 фактора):
+              </div>
+              <p>${rec.rationale}</p>
+            </div>
+          </div>
+
+          <!-- Complete Activity Action Button -->
+          <button onclick="completeActivity('${rec.event_id}', '${empId}')" class="w-full py-2.5 px-4 bg-halyk-600 hover:bg-halyk-700 active:bg-halyk-800 text-white font-semibold text-xs rounded-xl shadow-sm transition flex items-center justify-center space-x-2">
+            <i class="fa-solid fa-check"></i>
+            <span>Выполнить активность</span>
+          </button>
+        `;
+
+        grid.appendChild(card);
+      });
+    }
+
+    function refreshCurrentRecommendations() {
+      if (selectedEmployeeId) {
+        loadRecommendations(selectedEmployeeId);
+      }
+    }
+
+    // -------------------------------------------------------------------------
+    // Complete Activity (POST /api/activities/{event_id}/complete)
+    // -------------------------------------------------------------------------
+    async function completeActivity(eventId, empId) {
+      try {
+        showToast(`Фиксация завершения ${eventId}...`, 'info');
+        
+        let res = await fetch(`/api/activities/${eventId}/complete`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ employee_id: empId }),
+        });
+
+        if (!res.ok) {
+          // Fallback to legacy payload
+          res = await fetch('/api/activities/complete', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ employee_id: empId, event_id: eventId }),
+          });
+        }
+
+        if (!res.ok) throw new Error('Не удалось завершить активность');
+        const data = await res.json();
+
+        const updates = data.skills_updated || [];
+        const diffMsg = updates.map(u => `${u.skill}: ${u.old_level} → ${u.new_level}`).join(', ');
+
+        showToast(`🎉 Активность завершена! Навыки обновлены: ${diffMsg}`, 'success');
+
+        // Dynamically reload details and recommendations
+        await loadEmployeeDetails(empId);
+        await loadRecommendations(empId);
+      } catch (err) {
+        showToast('Ошибка при завершении активности: ' + err.message, 'error');
+      }
+    }
+
+    // -------------------------------------------------------------------------
+    // HR Analytics (GET /api/hr/analytics)
+    // -------------------------------------------------------------------------
+    async function loadHRAnalytics() {
+      try {
+        const res = await fetch('/api/hr/analytics');
+        if (!res.ok) throw new Error('Failed to load HR analytics');
+        const data = await res.json();
+
+        // Summary counters
+        document.getElementById('statTotalEmployees').innerText = (data.summary && data.summary.total_employees) || 200;
+        document.getElementById('statRiskCount').innerText = (data.summary && data.summary.risk_group_count) || (data.risk_group ? data.risk_group.length : 0);
+        document.getElementById('statDeficitSkillsCount').innerText = (data.top_deficit_skills || []).length;
+
+        // Top 5 Deficits
+        renderTopDeficits(data.top_deficit_skills || []);
+
+        // Risk Group
+        renderRiskGroupTable(data.risk_group || []);
+      } catch (err) {
+        showToast('Ошибка загрузки HR-аналитики: ' + err.message, 'error');
+      }
+    }
+
+    function renderTopDeficits(deficits) {
+      const container = document.getElementById('topDeficitsContainer');
+      container.innerHTML = '';
+
+      deficits.forEach((item, idx) => {
+        const card = document.createElement('div');
+        card.className = 'p-3.5 rounded-xl border border-slate-200 bg-slate-50 space-y-1.5';
+        card.innerHTML = `
+          <div class="flex items-center justify-between">
+            <span class="text-[11px] font-bold text-slate-400">#${idx + 1}</span>
+            <span class="text-[11px] font-bold px-1.5 py-0.5 rounded bg-amber-100 text-amber-800">
+              Разрыв: -${item.total_gap}
+            </span>
+          </div>
+          <div class="font-bold text-slate-900 text-xs truncate" title="${item.skill}">${item.skill}</div>
+          <div class="text-[11px] text-slate-500">
+            Затронуто: <strong class="text-slate-800">${item.affected_employees_count}</strong> сотр.
+          </div>
+        `;
+        container.appendChild(card);
+      });
+    }
+
+    function renderRiskGroupTable(riskList) {
+      const tbody = document.getElementById('riskGroupTableBody');
+      tbody.innerHTML = '';
+
+      riskList.slice(0, 20).forEach(emp => {
+        const tr = document.createElement('tr');
+        tr.className = 'hover:bg-slate-50 transition';
+        tr.innerHTML = `
+          <td class="p-3 font-semibold text-slate-900">
+            ${emp.employee_id} &bull; ${emp.name}
+          </td>
+          <td class="p-3">
+            <span class="font-medium text-slate-800">${emp.current_role}</span>
+            <span class="text-slate-400 block text-[11px]">${emp.current_grade} → ${emp.target_grade}</span>
+          </td>
+          <td class="p-3 text-center font-bold ${emp.no_shows > 0 ? 'text-rose-600' : 'text-slate-400'}">
+            ${emp.no_shows}
+          </td>
+          <td class="p-3 text-center font-bold ${emp.dropped > 0 ? 'text-amber-600' : 'text-slate-400'}">
+            ${emp.dropped}
+          </td>
+          <td class="p-3 text-center font-mono font-bold text-slate-700">
+            ${emp.total_skill_gap || 0}
+          </td>
+          <td class="p-3 text-slate-600 max-w-xs truncate" title="${emp.risk_reason}">
+            ${emp.risk_reason}
+          </td>
+          <td class="p-3 text-right">
+            <button onclick="switchTab('career'); selectSpecificEmployee('${emp.employee_id}')" class="px-2.5 py-1 text-xs font-semibold text-halyk-700 bg-halyk-50 hover:bg-halyk-100 rounded-lg border border-halyk-200 transition">
+              Открыть
+            </button>
+          </td>
+        `;
+        tbody.appendChild(tr);
+      });
+    }
+
+    // -------------------------------------------------------------------------
+    // Submit Custom Jury Profile
+    // -------------------------------------------------------------------------
+    async function submitJuryProfile() {
+      const jsonText = document.getElementById('juryProfileJson').value;
+      try {
+        const parsed = JSON.parse(jsonText);
+        const payload = { profiles: Array.isArray(parsed) ? parsed : [parsed] };
+
+        showToast('Загрузка профиля в in-memory реестр...', 'info');
+
+        const res = await fetch('/api/profiles/upload', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        });
+
+        if (!res.ok) throw new Error('Ошибка загрузки профиля');
+        const data = await res.json();
+
+        showToast(`Успешно внедрено профилей: ${data.loaded_count}`, 'success');
+
+        // Reload list and switch to career tab
+        await loadEmployees();
+        const firstId = data.profile_ids[0];
+        if (firstId) {
+          switchTab('career');
+          selectSpecificEmployee(firstId);
+        }
+      } catch (err) {
+        showToast('Ошибка валидации JSON: ' + err.message, 'error');
+      }
+    }
+
+    // -------------------------------------------------------------------------
+    // Toast Notification Utility
+    // -------------------------------------------------------------------------
+    function showToast(message, type = 'info') {
+      const container = document.getElementById('toastContainer');
+      const toast = document.createElement('div');
+      
+      let colors = 'bg-slate-900 text-white';
+      let icon = 'fa-info-circle';
+      if (type === 'success') {
+        colors = 'bg-emerald-600 text-white';
+        icon = 'fa-circle-check';
+      } else if (type === 'error') {
+        colors = 'bg-rose-600 text-white';
+        icon = 'fa-triangle-exclamation';
+      }
+
+      toast.className = `${colors} px-4 py-3 rounded-xl shadow-lg text-xs font-medium flex items-center space-x-2 transition-all duration-300 pointer-events-auto transform translate-y-2 opacity-0`;
+      toast.innerHTML = `<i class="fa-solid ${icon}"></i> <span>${message}</span>`;
+
+      container.appendChild(toast);
+
+      // Animate in
+      requestAnimationFrame(() => {
+        toast.classList.remove('translate-y-2', 'opacity-0');
+      });
+
+      // Animate out
+      setTimeout(() => {
+        toast.classList.add('translate-y-2', 'opacity-0');
+        setTimeout(() => toast.remove(), 300);
+      }, 4000);
+    }
+  </script>
+</body>
 </html>

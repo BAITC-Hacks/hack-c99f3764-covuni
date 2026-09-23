@@ -412,12 +412,14 @@ def healthcheck() -> Dict[str, Any]:
 
 
 @app.get("/api/profiles", response_model=List[EmployeeProfile], summary="List all employee profiles")
+@app.get("/api/employees", response_model=List[EmployeeProfile], summary="List all employee profiles (alias)")
 def list_profiles(include_custom: bool = True) -> List[EmployeeProfile]:
     loader = get_data_loader()
     return loader.get_all_employees(include_custom=include_custom)
 
 
 @app.get("/api/profiles/{employee_id}", response_model=EmployeeProfile, summary="Get employee profile by ID")
+@app.get("/api/employees/{employee_id}", response_model=EmployeeProfile, summary="Get employee profile by ID (alias)")
 def get_profile(employee_id: str) -> EmployeeProfile:
     loader = get_data_loader()
     profile = loader.get_employee(employee_id)
@@ -578,6 +580,23 @@ def complete_activity(req: CompleteActivityRequest) -> CompleteActivityResponse:
         skills_updated=skills_updated,
         employee=updated_emp,
     )
+
+
+class CompleteActivityPathPayload(BaseModel):
+    employee_id: str
+
+
+@app.post(
+    "/api/activities/{event_id}/complete",
+    response_model=CompleteActivityResponse,
+    summary="Record event completion by event_id in URL path",
+)
+def complete_activity_by_id(
+    event_id: str,
+    payload: CompleteActivityPathPayload,
+) -> CompleteActivityResponse:
+    """Convenience endpoint accepting event_id in path (e.g. POST /api/activities/EV_005/complete)."""
+    return complete_activity(CompleteActivityRequest(employee_id=payload.employee_id, event_id=event_id))
 
 
 @app.get("/api/hr/analytics", response_model=HRAnalyticsResponse, summary="Get company-wide HR upskilling analytics")

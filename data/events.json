@@ -1,0 +1,57 @@
+[
+  {
+    "id": "ev_001",
+    "title": "Halyk High-Load & System Design Intensive",
+    "format": "workshop",
+    "difficulty": "advanced",
+    "target_skills": ["System Design", "Kubernetes"],
+    "skill_gain": 1,
+    "duration_hours": 8,
+    "date": "2026-10-10",
+    "description": "Практический воркшоп по проектированию отказоустойчивых банковских микросервисов под пиковые нагрузки."
+  },
+  {
+    "id": "ev_002",
+    "title": "Production Kubernetes & Service Mesh Masterclass",
+    "format": "masterclass",
+    "difficulty": "intermediate",
+    "target_skills": ["Kubernetes", "Docker"],
+    "skill_gain": 1,
+    "duration_hours": 6,
+    "date": "2026-10-18",
+    "description": "Развертывание и траблшутинг кластеров k8s в корпоративном контуре банка."
+  },
+  {
+    "id": "ev_003",
+    "title": "FastAPI & Async Python Enterprise Patterns",
+    "format": "webinar",
+    "difficulty": "intermediate",
+    "target_skills": ["FastAPI", "Python"],
+    "skill_gain": 1,
+    "duration_hours": 4,
+    "date": "2026-10-25",
+    "description": "Паттерны проектирования асинхронных API с интеграцией с очередями и кэшированием."
+  },
+  {
+    "id": "ev_004",
+    "title": "MLOps in FinTech: From Jupyter to Production",
+    "format": "hackathon",
+    "difficulty": "advanced",
+    "target_skills": ["MLOps", "Machine Learning"],
+    "skill_gain": 2,
+    "duration_hours": 16,
+    "date": "2026-11-05",
+    "description": "Хакатон по построению CI/CD пайплайнов для антифрод-моделей."
+  },
+  {
+    "id": "ev_005",
+    "title": "Public Speaking & Effective Presentations for IT",
+    "format": "webinar",
+    "difficulty": "beginner",
+    "target_skills": ["Public Speaking"],
+    "skill_gain": 1,
+    "duration_hours": 4,
+    "date": "2026-11-12",
+    "description": "Базовый тренинг по ораторскому мастерству и публичным выступлениям для технических специалистов."
+  }
+]

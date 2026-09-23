@@ -1,0 +1,6 @@
+employee_id,event_id,event_date,status,score,feedback
+emp_001,ev_past_01,2025-01-15,completed,4.9,Отличный материал по архитектуре
+emp_001,ev_past_02,2025-05-20,completed,4.5,Полезно для работы с БД
+emp_001,ev_past_03,2025-11-10,skipped,0.0,Не смог присутствовать из-за релиза
+emp_002,ev_past_04,2025-03-12,completed,5.0,Потрясающий практикум по ML
+emp_002,ev_past_05,2025-09-18,completed,4.7,Разобрали метрики качества

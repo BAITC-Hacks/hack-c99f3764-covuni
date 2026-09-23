@@ -1,0 +1,61 @@
+{
+  "skills": [
+    {"id": "sk_python", "name": "Python", "category": "Programming"},
+    {"id": "sk_postgres", "name": "PostgreSQL", "category": "Databases"},
+    {"id": "sk_fastapi", "name": "FastAPI", "category": "Backend"},
+    {"id": "sk_docker", "name": "Docker", "category": "DevOps"},
+    {"id": "sk_sysdesign", "name": "System Design", "category": "Architecture"},
+    {"id": "sk_k8s", "name": "Kubernetes", "category": "DevOps"},
+    {"id": "sk_ml", "name": "Machine Learning", "category": "AI/ML"},
+    {"id": "sk_dl", "name": "Deep Learning", "category": "AI/ML"},
+    {"id": "sk_mlops", "name": "MLOps", "category": "DevOps/AI"},
+    {"id": "sk_public_speaking", "name": "Public Speaking", "category": "Soft Skills"}
+  ],
+  "grade_requirements": {
+    "Backend Developer": {
+      "Junior": {
+        "Python": 2,
+        "PostgreSQL": 1,
+        "FastAPI": 1,
+        "Docker": 1
+      },
+      "Middle": {
+        "Python": 3,
+        "PostgreSQL": 3,
+        "FastAPI": 3,
+        "Docker": 2,
+        "System Design": 2,
+        "Kubernetes": 1
+      },
+      "Senior": {
+        "Python": 4,
+        "PostgreSQL": 4,
+        "FastAPI": 4,
+        "Docker": 3,
+        "System Design": 4,
+        "Kubernetes": 3
+      }
+    },
+    "Data Scientist": {
+      "Junior": {
+        "Python": 2,
+        "SQL": 2,
+        "Machine Learning": 1
+      },
+      "Middle": {
+        "Python": 3,
+        "SQL": 3,
+        "Machine Learning": 3,
+        "Deep Learning": 2,
+        "MLOps": 2
+      },
+      "Senior": {
+        "Python": 4,
+        "SQL": 4,
+        "Machine Learning": 4,
+        "Deep Learning": 3,
+        "MLOps": 3
+      }
+    }
+  }
+}

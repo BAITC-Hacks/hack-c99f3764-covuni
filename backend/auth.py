@@ -4,8 +4,10 @@ from __future__ import annotations
 import hashlib
 import hmac
 import json
+import logging
 import os
 import secrets
+import sqlite3
 import time
 from contextlib import closing
 from urllib.parse import unquote
@@ -15,10 +17,16 @@ from fastapi.responses import JSONResponse
 COOKIE_NAME = "career_quest_session"
 SESSION_SECONDS = 8 * 60 * 60
 ITERATIONS = 600_000
+logger = logging.getLogger("career_quest.auth")
 
 
 def enabled() -> bool:
     return os.getenv("AUTH_ENABLED", "false").lower() in {"1", "true", "yes"}
+
+
+def demo_accounts_enabled() -> bool:
+    """Whether the safe, non-production demo accounts should be bootstrapped."""
+    return os.getenv("DEMO_ACCOUNTS_ENABLED", "false").lower() in {"1", "true", "yes"}
 
 
 def password_digest(password: str, salt: str) -> str:
@@ -73,6 +81,57 @@ class AuthService:
         if token:
             with closing(self.store._connect()) as conn:
                 conn.execute("DELETE FROM sessions WHERE token_hash=?", (hashlib.sha256(token.encode()).hexdigest(),))
+
+
+def ensure_demo_accounts(store, employee_lookup=None) -> list[str]:
+    """Create portable hackathon demo accounts once, without storing plain passwords.
+
+    Credentials are intentionally configurable through the environment so the
+    repository contains only demo values in ``.env.example``. Existing accounts
+    are left untouched, which makes startup idempotent and preserves any later
+    password changes made by the team.
+    """
+    if not demo_accounts_enabled():
+        return []
+
+    accounts = [
+        {
+            "username": os.getenv("DEMO_EMPLOYEE_USERNAME", "demo.employee"),
+            "password": os.getenv("DEMO_EMPLOYEE_PASSWORD", "CareerQuest-Employee-2026!"),
+            "role": "employee",
+            "employee_id": os.getenv("DEMO_EMPLOYEE_ID", "E0001"),
+        },
+        {
+            "username": os.getenv("DEMO_HR_USERNAME", "hr.manager"),
+            "password": os.getenv("DEMO_HR_PASSWORD", "CareerQuest-HR-2026!"),
+            "role": "hr",
+            "employee_id": None,
+        },
+    ]
+    auth = AuthService(store)
+    created: list[str] = []
+    with closing(store._connect()) as conn:
+        existing = {row["username"] for row in conn.execute("SELECT username FROM users")}
+
+    for account in accounts:
+        username = account["username"].strip().lower()
+        if username in existing:
+            continue
+        if account["role"] == "employee" and employee_lookup is not None:
+            if not account["employee_id"] or employee_lookup(account["employee_id"]) is None:
+                logger.warning("Demo employee account skipped: employee_id=%s was not found", account["employee_id"])
+                continue
+        try:
+            auth.create_user(username, account["password"], account["role"], account["employee_id"])
+        except sqlite3.IntegrityError:
+            # Another worker may have initialized the same account concurrently.
+            continue
+        except ValueError as exc:
+            logger.warning("Demo account %s was skipped: %s", username, exc)
+            continue
+        created.append(username)
+        existing.add(username)
+    return created
 
 
 def request_token(request) -> str | None:

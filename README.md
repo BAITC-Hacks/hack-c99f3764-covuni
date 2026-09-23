@@ -1,3 +1,5 @@
+
+
 # 🏦 Halyk Bank — Career Quest (HackAlem AI)
 ### Интеллектуальная система персонализированного развития сотрудников с объяснимым многофакторным скорингом
 
@@ -12,6 +14,8 @@
 **Команда:** Team 202453  
 
 ---
+demo-version 
+https://drive.google.com/file/d/1y_WvrFpE_SdbJ7GbbMBSF6HYmxoYwC92/view?usp=sharing
 
 ## 📌 Оглавление
 1. [О проекте](#-о-проекте)

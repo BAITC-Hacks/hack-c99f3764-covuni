@@ -22,6 +22,13 @@ from fastapi import FastAPI, File, HTTPException, UploadFile, status
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
+import sys
+from pathlib import Path
+
+backend_dir = Path(__file__).resolve().parent
+if str(backend_dir) not in sys.path:
+    sys.path.insert(0, str(backend_dir))
+
 from data_loader import (
     CustomProfileUploadRequest,
     CustomProfileUploadResponse,
@@ -93,111 +100,216 @@ class HRAnalyticsResponse(BaseModel):
 # Multi-Factor Scoring & Explainable Rationale Engine
 # ==============================================================================
 
+SNAPSHOT_DATE = "2026-10-01"
+
+
+def get_emp_skill_level(emp: EmployeeProfile, loader: DataLoader, skill_id_or_name: str) -> int:
+    """Safely retrieves skill level for an employee supporting both canonical IDs and human names."""
+    norm_id = loader.normalize_skill_id(skill_id_or_name)
+    sk_name = loader.get_skill_name(norm_id)
+    if norm_id in emp.skills:
+        return emp.skills[norm_id]
+    if sk_name in emp.skills:
+        return emp.skills[sk_name]
+    if skill_id_or_name in emp.skills:
+        return emp.skills[skill_id_or_name]
+    norm_lower = norm_id.lower()
+    for k, v in emp.skills.items():
+        if k.lower() == norm_lower or k.lower() == sk_name.lower():
+            return v
+    return 0
+
+
 def calculate_multi_factor_recommendations(
     emp: EmployeeProfile,
     loader: DataLoader,
     max_recommendations: int = 3,
 ) -> List[RecommendationItem]:
     """
-    Computes explainable recommendations based on the 4-factor scoring model:
-    1. Skill Deficit (gap between target grade requirement and current level)
-    2. Promotion Criticality (core technical skills required for promotion have 2.5x multiplier)
-    3. Behavioral History & Fatigue (penalties for skipped formats/events, bonuses for high ratings)
-    4. Event Fit & Efficiency (gain per hour, format affinity)
+    Computes explainable recommendations based on the 4 strict organizer rules:
+    1. Snapshot Date (2026-10-01): Scheduled events must have upcoming sessions >= 2026-10-01.
+    2. Strict Event Filtering:
+       - Mandatory events (EV_001..EV_004) are excluded.
+       - Events with 'completed' status in history are excluded (EXCEPT EV_036 Public Speaking Club).
+       - Prerequisites check: if emp.skills[req_skill] < req_level, event is forbidden.
+       - Ceiling check (max_level): if emp.skills[dev_skill] >= max_level for all developed skills, event is filtered out.
+    3. Critical Skills Priority:
+       - Role profiles target grade critical_skills get x2.5 multiplier as promotion blockers.
+    4. Behavioral History Penalties:
+       - Penalties for 'no_show' and 'dropped' statuses across formats (online, offline, self_paced).
     """
     events = loader.get_events()
-    grade_reqs = loader.get_grade_requirements(emp.current_role, emp.target_grade)
+    target_role = emp.target_role
+    target_grade = emp.target_grade
+    grade_reqs = loader.get_grade_requirements(target_role, target_grade)
+    critical_skills = set(loader.get_critical_skills(target_role, target_grade))
     history = loader.get_employee_history(emp.id)
 
-    # Extract historical behavioral patterns
-    skipped_events = set()
-    skipped_formats = set()
+    # 1. Historical event status sets
+    completed_events = set()
+    dropped_events = set()
+    no_show_events = set()
     if not history.empty and "status" in history.columns:
-        skipped_df = history[history["status"] == "skipped"]
-        if "event_id" in skipped_df.columns:
-            skipped_events = set(skipped_df["event_id"].astype(str))
+        completed_df = history[history["status"] == "completed"]
+        if "event_id" in completed_df.columns:
+            completed_events = set(completed_df["event_id"].astype(str).str.upper())
 
-    scored_candidates = []
+        dropped_df = history[history["status"].isin(["dropped", "skipped"])]
+        if "event_id" in dropped_df.columns:
+            dropped_events = set(dropped_df["event_id"].astype(str).str.upper())
+
+        no_show_df = history[history["status"] == "no_show"]
+        if "event_id" in no_show_df.columns:
+            no_show_events = set(no_show_df["event_id"].astype(str).str.upper())
+
+    # Format-level behavioral statistics
+    format_stats = loader.get_employee_format_stats(emp.id)
+
+    scored_candidates: List[RecommendationItem] = []
 
     for event in events:
-        # Check target skills of the event
-        for target_skill in event.target_skills:
-            current_level = emp.skills.get(target_skill, 0)
-            required_level = grade_reqs.get(target_skill, 0)
+        ev_id = event.event_id.upper()
 
-            # Factor 1: Skill Deficit (S_gap)
-            skill_gap = max(0, required_level - current_level)
+        # Rule 2.1: Mandatory exclusion
+        if event.mandatory or ev_id in {"EV_001", "EV_002", "EV_003", "EV_004"}:
+            continue
 
-            # Factor 2: Promotion Criticality (W_crit)
-            # If skill is not required for next grade promotion, weight is 0.0
-            is_grade_requirement = target_skill in grade_reqs
-            promotion_weight = 2.5 if (is_grade_requirement and skill_gap > 0) else 0.1
+        # Rule 2.2: Completed exclusion (EXCEPTION: EV_036 Public Speaking Club)
+        if ev_id != "EV_036" and ev_id in completed_events:
+            continue
 
-            # Factor 3: History & Engagement Penalty/Bonus (H_history)
-            history_multiplier = 1.0
-            history_reasons = []
+        # Rule 2.3: Prerequisites check (emp.skill < min_level -> forbidden)
+        prereq_failed = False
+        for req_sk, min_lvl in event.prerequisites.items():
+            emp_lvl = get_emp_skill_level(emp, loader, req_sk)
+            if emp_lvl < min_lvl:
+                prereq_failed = True
+                break
+        if prereq_failed:
+            continue
 
-            # Check if this exact event or skill format was repeatedly skipped
-            if event.id in skipped_events:
-                history_multiplier *= 0.3
-                history_reasons.append("ранее пропущенное мероприятие")
+        # Rule 1: Snapshot Date Check for Scheduled Events
+        if event.format != "self_paced":
+            future_sessions = [s for s in event.upcoming_sessions if s >= SNAPSHOT_DATE]
+            if not future_sessions:
+                continue
 
-            # Check if format has high skip rate in history
-            if not history.empty and "status" in history.columns:
-                user_skips_for_format = 0
-                for _, row in history.iterrows():
-                    hist_ev = loader.get_event(str(row.get("event_id", "")))
-                    if hist_ev and hist_ev.format == event.format and row.get("status") == "skipped":
-                        user_skips_for_format += 1
-                
-                if user_skips_for_format >= 2:
-                    history_multiplier *= 0.4
-                    history_reasons.append(f"низкая вовлеченность в формат {event.format} (пропусков: {user_skips_for_format})")
+        # Rule 2.4: Ceiling Cap Check (max_level)
+        # Event must provide positive gain for at least one skill
+        valid_devs = []
+        for dev in event.develops_skills:
+            cur_lvl = get_emp_skill_level(emp, loader, dev.skill_id)
+            if cur_lvl < dev.max_level:
+                valid_devs.append((dev, cur_lvl))
+        if not valid_devs:
+            continue
 
-            # Factor 4: Event Fit & Efficiency (E_fit)
-            efficiency = (event.skill_gain / max(event.duration_hours, 1.0)) * 2.0
-            pref_formats = emp.preferences.get("preferred_formats", []) if emp.preferences else []
-            if event.format in pref_formats:
-                efficiency += 1.0
+        # Evaluate skills developed by this event
+        best_dev = None
+        best_skill_score = -1.0
+        best_norm_sk = ""
+        best_sk_name = ""
+        best_cur_lvl = 0
+        best_req_lvl = 0
+        best_gap = 0
+        best_is_critical = False
+        synergy_score = 0.0
 
-            # Composite Score Formula
-            base_score = (skill_gap * 3.0) + (promotion_weight * 2.0) + efficiency
-            total_score = round(base_score * history_multiplier, 2)
+        for dev, cur_lvl in valid_devs:
+            norm_sk = loader.normalize_skill_id(dev.skill_id)
+            sk_name = loader.get_skill_name(norm_sk)
+            req_lvl = grade_reqs.get(norm_sk, grade_reqs.get(sk_name, 0))
+            gap = max(0, req_lvl - cur_lvl)
+            eff_gain = min(dev.gain, dev.max_level - cur_lvl)
 
-            # Only consider events with meaningful positive score
-            if total_score > 0.5:
-                # Deterministic Explainable Rationale
-                crit_desc = "Критический блокер грейда" if (is_grade_requirement and skill_gap > 0) else "Дополнительный развивающий навык"
-                hist_desc = (
-                    f"Штраф истории: {', '.join(history_reasons)}"
-                    if history_reasons
-                    else "Высокая готовность к участию (без пропусков в истории)"
+            is_crit = (norm_sk in critical_skills) or any(
+                c.lower() in [norm_sk.lower(), sk_name.lower()] for c in critical_skills
+            )
+
+            # Rule 3: Priority of Critical Skills (x2.5 multiplier for promotion blocker)
+            crit_mult = 2.5 if (is_crit and gap > 0) else 1.0
+            crit_boost = 5.0 if (is_crit and gap > 0) else 0.0
+
+            s_score = (gap * 3.0 * crit_mult) + crit_boost + (eff_gain * 2.0)
+
+            if s_score > best_skill_score:
+                if best_dev is not None:
+                    synergy_score += 1.0  # Bonus for multi-skill development
+                best_skill_score = s_score
+                best_dev = dev
+                best_norm_sk = norm_sk
+                best_sk_name = sk_name
+                best_cur_lvl = cur_lvl
+                best_req_lvl = req_lvl
+                best_gap = gap
+                best_is_critical = is_crit
+            else:
+                synergy_score += 0.5
+
+        # Rule 4: Behavioral History Penalties
+        fmt = event.format
+        fmt_data = format_stats.get(fmt, {})
+        no_shows = fmt_data.get("no_show", 0)
+        dropped = fmt_data.get("dropped", 0)
+
+        history_multiplier = 1.0
+        history_reasons = []
+
+        if no_shows > 0:
+            history_multiplier -= min(0.35, 0.15 * no_shows)
+            history_reasons.append(f"{no_shows} неявка (no_show) в формате {fmt}")
+        if dropped > 0:
+            history_multiplier -= min(0.30, 0.10 * dropped)
+            history_reasons.append(f"{dropped} прерванный курс (dropped) в формате {fmt}")
+
+        if ev_id in dropped_events or ev_id in no_show_events:
+            history_multiplier *= 0.5
+            history_reasons.append("ранее пропущенное или брошенное мероприятие")
+
+        history_multiplier = max(0.2, history_multiplier)
+
+        # Event Fit & Efficiency
+        efficiency = (event.skill_gain / max(event.duration_hours, 1.0)) * 2.0
+        pref_formats = emp.preferences.get("preferred_formats", []) if emp.preferences else []
+        if event.format in pref_formats:
+            efficiency += 1.5
+
+        total_score = round((best_skill_score + synergy_score + efficiency) * history_multiplier, 2)
+
+        if total_score > 0.0:
+            crit_text = (
+                "Критический блокер грейда (мультипликатор x2.5)"
+                if (best_is_critical and best_gap > 0)
+                else ("Целевой навык грейда" if best_gap > 0 else "Дополнительное развитие")
+            )
+            hist_text = (
+                f"Штраф истории: {', '.join(history_reasons)}"
+                if history_reasons
+                else f"Высокая вовлеченность (без штрафов в формате {fmt})"
+            )
+
+            rationale = (
+                f"[Фактор 1: Дефицит] Навык '{best_sk_name}': текущий уровень {best_cur_lvl}, "
+                f"требование для {target_grade}: {best_req_lvl} (разрыв: {best_gap}). "
+                f"[Фактор 2: Критичность] {crit_text}. "
+                f"[Фактор 3: История] {hist_text}. "
+                f"[Фактор 4: Эффективность] Формат {fmt}, прирост +{best_dev.gain} (потолок: {best_dev.max_level}) за {event.duration_hours}ч."
+            )
+
+            scored_candidates.append(
+                RecommendationItem(
+                    event_id=event.event_id,
+                    title=event.title,
+                    target_skill=best_sk_name,
+                    gain=best_dev.gain,
+                    max_level=best_dev.max_level,
+                    score=total_score,
+                    rationale=rationale,
                 )
+            )
 
-                rationale = (
-                    f"[Фактор 1: Дефицит] Текущий уровень '{target_skill}': {current_level}, "
-                    f"требование для {emp.target_grade}: {required_level} (разрыв: {skill_gap}). "
-                    f"[Фактор 2: Критичность] {crit_desc}. "
-                    f"[Фактор 3: История] {hist_desc}. "
-                    f"[Фактор 4: Эффективность] Формат {event.format} (+{event.skill_gain} за {event.duration_hours}ч)."
-                )
-
-                scored_candidates.append(
-                    RecommendationItem(
-                        event_id=event.id,
-                        title=event.title,
-                        target_skill=target_skill,
-                        gain=event.skill_gain,
-                        max_level=5,
-                        score=total_score,
-                        rationale=rationale,
-                    )
-                )
-
-    # Sort descending by score
     scored_candidates.sort(key=lambda x: x.score, reverse=True)
 
-    # Remove duplicates for the same event
     unique_recommendations: List[RecommendationItem] = []
     seen_events = set()
     for item in scored_candidates:
@@ -207,7 +319,6 @@ def calculate_multi_factor_recommendations(
         if len(unique_recommendations) >= max_recommendations:
             break
 
-    # Attempt LLM-enhancement if API key is provided, otherwise return deterministic rationale
     return enhance_with_llm_if_available(emp, unique_recommendations)
 
 
@@ -420,37 +531,50 @@ def complete_activity(req: CompleteActivityRequest) -> CompleteActivityResponse:
         raise HTTPException(status_code=404, detail=f"Event '{req.event_id}' not found")
 
     skills_updated: List[SkillProgressDiff] = []
-    max_level = 5
 
-    for skill in event.target_skills:
-        current_level = emp.skills.get(skill, 0)
-        new_level = min(current_level + event.skill_gain, max_level)
+    develops = event.develops_skills
+    if not develops and event.target_skills:
+        from data_loader import DevelopsSkillItem
+        develops = [
+            DevelopsSkillItem(skill_id=loader.normalize_skill_id(s), gain=event.skill_gain, max_level=5)
+            for s in event.target_skills
+        ]
+
+    for dev in develops:
+        sk_id = dev.skill_id
+        sk_name = loader.get_skill_name(sk_id)
+        current_level = get_emp_skill_level(emp, loader, sk_id)
+        new_level = min(current_level + dev.gain, dev.max_level)
         gain = new_level - current_level
-        loader.update_employee_skill(emp.id, skill, new_level)
+        loader.update_employee_skill(emp.id, sk_id, new_level)
+        if sk_name != sk_id and sk_name in emp.skills:
+            emp.skills[sk_name] = new_level
+
         skills_updated.append(
             SkillProgressDiff(
-                skill=skill,
+                skill=sk_name,
                 old_level=current_level,
                 new_level=new_level,
                 gain=gain,
-                max_level=max_level,
+                max_level=dev.max_level,
             )
         )
 
     # Record completion in activity history
     loader.record_activity(
         employee_id=emp.id,
-        event_id=event.id,
+        event_id=event.event_id,
         status="completed",
-        score=5.0,
+        score=100.0,
         feedback=f"Успешное завершение курса '{event.title}'",
+        event_date=SNAPSHOT_DATE,
     )
 
     updated_emp = loader.get_employee(emp.id)
     return CompleteActivityResponse(
         status="success",
         employee_id=emp.id,
-        event_id=event.id,
+        event_id=event.event_id,
         skills_updated=skills_updated,
         employee=updated_emp,
     )

@@ -110,6 +110,7 @@ def run_smoke_test(base_url: str = "http://localhost:8000") -> bool:
                     "Python": 4,
                     "PostgreSQL": 4,
                     "FastAPI": 4,
+                    "API Design": 4,
                     "Docker": 3,
                     "System Design": 2,      # Target 4 for Senior (Deficit: 2, PROMOTION BLOCKER)
                     "Kubernetes": 3,
@@ -163,7 +164,7 @@ def run_smoke_test(base_url: str = "http://localhost:8000") -> bool:
     # STEP 4: Complete Activity & Verify Skill Shift
     # --------------------------------------------------------------------------
     print(f"{BOLD}4. Прокачка компетенций: фиксация завершения активности (POST /api/activities/complete)...{RESET}")
-    act_payload = {"employee_id": candidate_id, "event_id": "ev_001"}
+    act_payload = {"employee_id": candidate_id, "event_id": "EV_005"}
     status, body, elapsed = api_request(f"{base_url}/api/activities/complete", method="POST", payload=act_payload)
     if status == 200:
         updates = body.get("skills_updated", [])

@@ -102,20 +102,24 @@ class DataLoader:
         self._initialized = False
 
     def _resolve_data_dir(self, data_dir: Optional[Union[str, Path]]) -> Path:
-        """Resolve directory path with fallback priority: arg -> env var -> standard path."""
+        """Resolve directory path with fallback priority: arg (if exists) -> env var (if exists) -> standard paths."""
         if data_dir:
-            return Path(data_dir)
+            p = Path(data_dir)
+            if p.is_dir():
+                return p
         
         env_dir = os.getenv("DATA_DIR")
         if env_dir:
-            return Path(env_dir)
+            p = Path(env_dir)
+            if p.is_dir():
+                return p
             
-        # Try local ./data or relative to current file
+        # Try standard directory candidates
         candidates = [
             Path.cwd() / "data",
             Path(__file__).resolve().parent.parent / "data",
             Path(__file__).resolve().parent / "data",
-            Path("/app/data")
+            Path("/app/data"),
         ]
         for candidate in candidates:
             if candidate.is_dir():
@@ -311,6 +315,111 @@ class DataLoader:
             if self._activity_history.empty or "employee_id" not in self._activity_history.columns:
                 return pd.DataFrame()
             return self._activity_history[self._activity_history["employee_id"] == str(employee_id)].copy()
+
+    def update_employee_skill(
+        self, employee_id: str, skill_name: str, new_level: int
+    ) -> Optional[EmployeeProfile]:
+        """Updates a specific skill level for an employee in memory."""
+        with self.lock:
+            emp = self._employees.get(str(employee_id))
+            if not emp:
+                return None
+            emp.skills[skill_name] = new_level
+            if str(employee_id) in self._custom_profiles:
+                self._custom_profiles[str(employee_id)].skills[skill_name] = new_level
+            return emp
+
+    def record_activity(
+        self,
+        employee_id: str,
+        event_id: str,
+        status: str = "completed",
+        score: float = 5.0,
+        feedback: str = "Завершено через Career Quest",
+        event_date: Optional[str] = None,
+    ) -> None:
+        """Appends a new participation record to activity history."""
+        from datetime import date
+        with self.lock:
+            new_row = {
+                "employee_id": str(employee_id),
+                "event_id": str(event_id),
+                "event_date": event_date or date.today().isoformat(),
+                "status": status,
+                "score": score,
+                "feedback": feedback,
+            }
+            if self._activity_history.empty:
+                self._activity_history = pd.DataFrame([new_row])
+            else:
+                self._activity_history = pd.concat(
+                    [self._activity_history, pd.DataFrame([new_row])],
+                    ignore_index=True,
+                )
+
+    def get_company_skill_deficits(self) -> List[Dict[str, Any]]:
+        """Calculates aggregated skill gaps across all employees for their target grades."""
+        with self.lock:
+            deficit_map: Dict[str, Dict[str, Any]] = {}
+            for emp in self._employees.values():
+                reqs = self.get_grade_requirements(emp.current_role, emp.target_grade)
+                for skill, required_level in reqs.items():
+                    current = emp.skills.get(skill, 0)
+                    gap = max(0, required_level - current)
+                    if gap > 0:
+                        if skill not in deficit_map:
+                            deficit_map[skill] = {
+                                "skill": skill,
+                                "total_gap": 0,
+                                "affected_employees_count": 0,
+                                "avg_gap": 0.0,
+                            }
+                        deficit_map[skill]["total_gap"] += gap
+                        deficit_map[skill]["affected_employees_count"] += 1
+
+            for item in deficit_map.values():
+                if item["affected_employees_count"] > 0:
+                    item["avg_gap"] = round(item["total_gap"] / item["affected_employees_count"], 2)
+
+            sorted_deficits = sorted(
+                deficit_map.values(), key=lambda x: (x["total_gap"], x["affected_employees_count"]), reverse=True
+            )
+            return sorted_deficits[:5]
+
+    def get_risk_group_employees(self) -> List[Dict[str, Any]]:
+        """Identifies employees with low engagement (high skip rate or large unresolved skill deficit)."""
+        with self.lock:
+            risk_list = []
+            for emp in self._employees.values():
+                history = self.get_employee_history(emp.id)
+                skipped_count = 0
+                completed_count = 0
+                if not history.empty and "status" in history.columns:
+                    skipped_count = int((history["status"] == "skipped").sum())
+                    completed_count = int((history["status"] == "completed").sum())
+
+                reqs = self.get_grade_requirements(emp.current_role, emp.target_grade)
+                total_gap = sum(max(0, req_lvl - emp.skills.get(sk, 0)) for sk, req_lvl in reqs.items())
+
+                # Risk criteria: >= 2 skips OR total gap >= 4 with low completion
+                is_risk = (skipped_count >= 2) or (total_gap >= 4 and completed_count == 0)
+                if is_risk:
+                    risk_list.append({
+                        "employee_id": emp.id,
+                        "name": emp.name,
+                        "current_role": emp.current_role,
+                        "current_grade": emp.current_grade,
+                        "target_grade": emp.target_grade,
+                        "skipped_events": skipped_count,
+                        "completed_events": completed_count,
+                        "total_skill_gap": total_gap,
+                        "risk_reason": (
+                            "Высокая доля пропусков обучающих мероприятий"
+                            if skipped_count >= 2
+                            else "Критический дефицит навыков до следующего грейда без активности"
+                        ),
+                    })
+            return risk_list
 
     def get_stats(self) -> Dict[str, Any]:
         """Returns dataset status summary for health check and diagnostics."""

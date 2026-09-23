@@ -18,11 +18,12 @@
 2. [Ключевая архитектура решения](#-ключевая-архитектура-решения)
 3. [Механизм Explainable Multi-factor Recommendation](#-механизм-explainable-multi-factor-recommendation)
 4. [Проверочные профили жюри (Jury Edge Cases)](#-проверочные-профили-жюри-jury-edge-cases)
-5. [Быстрый запуск в одну команду](#-быстрый-запуск-в-одну-команду)
-6. [Структура репозитория](#-структура-репозитория)
-7. [API Спецификация](#-api-спецификация)
-8. [Интерфейс (UI Preview)](#-интерфейс-ui-preview)
-9. [Состав команды и роли](#-состав-команды-и-роли)
+5. [Автоматическое тестирование и Corner Cases](#-автоматическое-тестирование-и-corner-cases)
+6. [Быстрый запуск в одну команду](#-быстрый-запуск-в-одну-команду)
+7. [Структура репозитория](#-структура-репозитория)
+8. [API Спецификация](#-api-спецификация)
+9. [Интерфейс (UI Preview)](#-интерфейс-ui-preview)
+10. [Состав команды и роли](#-состав-команды-и-роли)
 
 ---
 
@@ -178,6 +179,36 @@ curl -X POST http://localhost:8000/api/profiles/upload \
 
 ---
 
+## 🧪 Автоматическое тестирование и Corner Cases
+
+В проекте реализован полный набор end-to-end тестов с валидацией ключевых требований жюри.
+
+### Команды запуска тестов
+```bash
+# Запуск внутри запущенного Docker-контейнера
+docker compose exec backend pytest -v
+
+# Либо локальный запуск (через virtualenv)
+pytest backend/tests -v
+```
+
+### Какие сценарии покрыты тестами (`backend/tests/test_recommendations.py`):
+
+| Сценарий теста | Описание кейса | Ожидаемый результат | Статус |
+| :--- | :--- | :--- | :--- |
+| **`test_jury_corner_case_naive_rule_trap`** | Кандидат Middle Backend: `Public Speaking = 1` (минимальный навык в профиле), но в истории 3 пропуска софт-скилл вебинаров. `System Design = 2` при требовании **4** для Senior. | Модель **ОБЯЗАНА** рекомендовать `System Design` (воркшоп `ev_001`), а НЕ `Public Speaking`. Однофакторное правило здесь гарантированно ломается, наш алгоритм даёт **100% точность**. |  Passed |
+| **`test_skill_progress_shift_and_ceiling`** | Завершение обучающего события через `POST /api/activities/complete`: проверка прироста навыка на `gain` и соблюдение верхнего потолка `max_level = 5`. | Навык сотрудника обновляется в памяти (`2 ➡️ 3`), при достижении уровня `5` дальнейшие активности не превышают шкалу. |  Passed |
+| **`test_dynamic_custom_jury_profile_upload_and_recommendation`** | Загрузка кастомного JSON-профиля через `POST /api/profiles/upload` и моментальный расчет рекомендаций через `POST /api/recommendations`. | Профиль регистрируется в потокобезопасном кэше без рестарта сервера и сразу возвращает топ-3 релевантных события. |  Passed |
+| **`test_hr_analytics_aggregation`** | Запрос аналитики `GET /api/hr/analytics` по дефицитам компетенций компании и сотрудникам группы риска. | Возвращаются топ-5 проседающих навыков компании и кандидаты с высоким процентом пропусков. |  Passed |
+
+> [!TIP]
+> **Как алгоритм обходит "ловушку жюри":**  
+> 1. Фактор **$\mathcal{W}_{\text{crit}}$** проверяет матрицу грейда: `System Design` обязателен для роли Senior Backend Developer (получает вес 2.5x). Навык `Public Speaking` отсутствует в обязательных грейдовых требованиях Senior Backend (вес снижен до 0.1).  
+> 2. Фактор **$\mathcal{H}_{\text{history}}$** обнаруживает 3 пропуска вебинаров в истории сотрудника и накладывает штрафной коэффициент **0.4x** на события аналогичного формата и тематики.  
+> 3. Итоговый скор `System Design` оказывается в **~15 раз выше**, чем у `Public Speaking`.
+
+---
+
 ## 🚀 Быстрый запуск в одну команду
 
 Решение полностью контейнеризировано. Никаких локальных установок зависимостей не требуется.
@@ -219,9 +250,11 @@ docker compose up --build
 ```text
 ├── backend/
 │   ├── Dockerfile                  # Python 3.11-slim, multi-layer caching, non-root healthcheck
-│   ├── requirements.txt            # FastAPI, Uvicorn, Pydantic v2, Pandas, OpenAI
+│   ├── requirements.txt            # FastAPI, Uvicorn, Pydantic v2, Pandas, OpenAI, Pytest
 │   ├── data_loader.py              # In-memory thread-safe кэш 4 датасетов + Jury verification parser
-│   └── main.py                     # REST API эндпоинты, CORS, healthcheck, upload handlers
+│   ├── main.py                     # REST API эндпоинты, multi-factor скоринг, healthcheck, upload handlers
+│   └── tests/
+│       └── test_recommendations.py # Pytest suite: Corner cases, Jury Trap, Skill shifts, HR analytics
 ├── frontend/
 │   ├── Dockerfile                  # Multi-stage: Node.js 20 build -> Nginx 1.25 Alpine
 │   ├── nginx.conf                  # Reverse-proxy для /api/, gzip-сжатие, SPA HTML5 routing
@@ -253,6 +286,9 @@ docker compose up --build
 | `GET` | `/api/profiles/{id}` | Профиль сотрудника с текущими компетенциями и грейдом | `id: string` |
 | `POST` | `/api/profiles/upload` | **Динамическая загрузка профилей жюри (JSON Body)** | `{"profiles": [...]}` |
 | `POST` | `/api/profiles/upload-file` | **Загрузка профилей жюри через файл (.json)** | Multipart File |
+| `POST` | `/api/recommendations` | **Многофакторные рекомендации обучения с обоснованием (4 фактора)** | `{"employee_id": "emp_001"}` |
+| `POST` | `/api/activities/complete` | **Фиксация завершения курса и прокачка навыков сотрудника** | `{"employee_id": "...", "event_id": "..."}` |
+| `GET` | `/api/hr/analytics` | **HR-аналитика: топ дефицитов компании и группа риска** | — |
 | `GET` | `/api/events` | Каталог доступных мероприятий по апскиллингу | — |
 | `GET` | `/api/skills` | Каталог навыков и матрица грейдовых требований | — |
 

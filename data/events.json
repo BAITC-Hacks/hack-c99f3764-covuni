@@ -42,5 +42,16 @@
     "duration_hours": 16,
     "date": "2026-11-05",
     "description": "Хакатон по построению CI/CD пайплайнов для антифрод-моделей."
+  },
+  {
+    "id": "ev_005",
+    "title": "Public Speaking & Effective Presentations for IT",
+    "format": "webinar",
+    "difficulty": "beginner",
+    "target_skills": ["Public Speaking"],
+    "skill_gain": 1,
+    "duration_hours": 4,
+    "date": "2026-11-12",
+    "description": "Базовый тренинг по ораторскому мастерству и публичным выступлениям для технических специалистов."
   }
 ]

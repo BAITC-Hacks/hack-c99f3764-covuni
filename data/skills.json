@@ -8,7 +8,8 @@
     {"id": "sk_k8s", "name": "Kubernetes", "category": "DevOps"},
     {"id": "sk_ml", "name": "Machine Learning", "category": "AI/ML"},
     {"id": "sk_dl", "name": "Deep Learning", "category": "AI/ML"},
-    {"id": "sk_mlops", "name": "MLOps", "category": "DevOps/AI"}
+    {"id": "sk_mlops", "name": "MLOps", "category": "DevOps/AI"},
+    {"id": "sk_public_speaking", "name": "Public Speaking", "category": "Soft Skills"}
   ],
   "grade_requirements": {
     "Backend Developer": {

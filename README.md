@@ -14,7 +14,7 @@
 **Команда:** Team 202453  
 
 ---
-demo-version 
+demo-video
 https://drive.google.com/file/d/1y_WvrFpE_SdbJ7GbbMBSF6HYmxoYwC92/view?usp=sharing
 
 ## 📌 Оглавление
